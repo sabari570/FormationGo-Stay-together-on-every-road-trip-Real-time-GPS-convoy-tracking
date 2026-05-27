@@ -17,4 +17,19 @@ class JourneyDao extends DatabaseAccessor<AppDatabase> with _$JourneyDaoMixin {
 
   Future<void> saveJourney(JourneysCompanion journey) =>
       into(journeys).insertOnConflictUpdate(journey);
+
+  Future<void> deleteJourney(String id) =>
+      (delete(journeys)..where((t) => t.id.equals(id))).go();
+
+  Future<List<Checkpoint>> getCheckpoints(String journeyId) =>
+      (db.select(db.checkpoints)..where((t) => t.journeyId.equals(journeyId))).get();
+
+  Stream<List<Checkpoint>> watchCheckpoints(String journeyId) =>
+      (db.select(db.checkpoints)..where((t) => t.journeyId.equals(journeyId))).watch();
+
+  Future<void> saveCheckpoint(CheckpointsCompanion checkpoint) =>
+      db.into(db.checkpoints).insertOnConflictUpdate(checkpoint);
+
+  Future<void> deleteCheckpoint(String id) =>
+      (db.delete(db.checkpoints)..where((t) => t.id.equals(id))).go();
 }

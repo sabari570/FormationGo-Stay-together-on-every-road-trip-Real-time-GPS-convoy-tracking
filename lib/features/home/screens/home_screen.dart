@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/providers/repository_providers.dart';
+import '../../../domain/entities/journey.dart';
 import '../providers/home_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -13,6 +15,68 @@ class HomeScreen extends ConsumerWidget {
     if (hexString.length == 6 || hexString.length == 7) buffer.write('ff');
     buffer.write(hexString.replaceFirst('#', ''));
     return Color(int.parse(buffer.toString(), radix: 16));
+  }
+
+  Future<void> _confirmDeleteJourney(
+      BuildContext context, WidgetRef ref, JourneyEntity journey) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.bg1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+            side: const BorderSide(color: AppColors.border),
+          ),
+          title: Text(
+            'Delete Journey',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 18.sp,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to delete "${journey.name}"? This action cannot be undone.',
+            style: TextStyle(
+              color: Colors.grey[300],
+              fontSize: 14.sp,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey[400], fontSize: 14.sp),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.convoyRed,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+              ),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(
+                'Delete',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14.sp,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await ref.read(journeyRepositoryProvider).deleteJourney(journey.id);
+    }
   }
 
   @override
@@ -57,14 +121,20 @@ class HomeScreen extends ConsumerWidget {
                         children: [
                           Text(
                             'Hello, ${profile.name}',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
                                 ),
                           ),
                           Text(
                             'Ready to ride?',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
                                   color: Colors.grey[400],
                                 ),
                           ),
@@ -74,7 +144,8 @@ class HomeScreen extends ConsumerWidget {
                   );
                 },
                 loading: () => const CircularProgressIndicator(),
-                error: (_, __) => const Text('Error loading profile', style: TextStyle(color: Colors.white)),
+                error: (_, __) => const Text('Error loading profile',
+                    style: TextStyle(color: Colors.white)),
               ),
               SizedBox(height: 40.h),
               Row(
@@ -140,7 +211,19 @@ class HomeScreen extends ConsumerWidget {
                               journey.createdAt.toString().split(' ')[0],
                               style: TextStyle(color: Colors.grey[400]),
                             ),
-                            trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline,
+                                      color: Colors.redAccent),
+                                  onPressed: () => _confirmDeleteJourney(
+                                      context, ref, journey),
+                                ),
+                                const Icon(Icons.chevron_right,
+                                    color: Colors.grey),
+                              ],
+                            ),
                             onTap: () {
                               context.push('/journey/${journey.id}');
                             },
@@ -149,8 +232,10 @@ class HomeScreen extends ConsumerWidget {
                       },
                     );
                   },
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (_, __) => const Center(child: Text('Failed to load journeys')),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (_, __) =>
+                      const Center(child: Text('Failed to load journeys')),
                 ),
               ),
             ],
@@ -160,7 +245,11 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildActionCard(BuildContext context, {required String title, required IconData icon, required Color color, required VoidCallback onTap}) {
+  Widget _buildActionCard(BuildContext context,
+      {required String title,
+      required IconData icon,
+      required Color color,
+      required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(

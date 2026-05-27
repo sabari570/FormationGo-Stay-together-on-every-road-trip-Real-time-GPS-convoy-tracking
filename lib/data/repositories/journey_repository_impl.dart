@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import '../../domain/entities/journey.dart';
+import '../../domain/entities/checkpoint.dart';
 import '../../domain/repositories/journey_repository.dart';
 import '../database/daos/journey_dao.dart';
 import '../database/app_database.dart';
@@ -67,5 +68,57 @@ class JourneyRepositoryImpl implements JourneyRepository {
         destinationLng: Value(journey.destinationLng),
       ),
     );
+  }
+
+  @override
+  Future<void> deleteJourney(String id) async {
+    await _dao.deleteJourney(id);
+  }
+
+  CheckpointEntity _mapCheckpointToEntity(Checkpoint cp) {
+    return CheckpointEntity(
+      id: cp.id,
+      journeyId: cp.journeyId,
+      name: cp.name,
+      latitude: cp.latitude,
+      longitude: cp.longitude,
+      radius: cp.radius,
+      type: cp.type,
+    );
+  }
+
+  CheckpointsCompanion _mapCheckpointToCompanion(CheckpointEntity cp) {
+    return CheckpointsCompanion(
+      id: Value(cp.id),
+      journeyId: Value(cp.journeyId),
+      name: Value(cp.name),
+      latitude: Value(cp.latitude),
+      longitude: Value(cp.longitude),
+      radius: Value(cp.radius),
+      type: Value(cp.type),
+    );
+  }
+
+  @override
+  Future<List<CheckpointEntity>> getCheckpoints(String journeyId) async {
+    final list = await _dao.getCheckpoints(journeyId);
+    return list.map(_mapCheckpointToEntity).toList();
+  }
+
+  @override
+  Stream<List<CheckpointEntity>> watchCheckpoints(String journeyId) {
+    return _dao.watchCheckpoints(journeyId).map(
+          (list) => list.map(_mapCheckpointToEntity).toList(),
+        );
+  }
+
+  @override
+  Future<void> saveCheckpoint(CheckpointEntity checkpoint) async {
+    await _dao.saveCheckpoint(_mapCheckpointToCompanion(checkpoint));
+  }
+
+  @override
+  Future<void> deleteCheckpoint(String id) async {
+    await _dao.deleteCheckpoint(id);
   }
 }
