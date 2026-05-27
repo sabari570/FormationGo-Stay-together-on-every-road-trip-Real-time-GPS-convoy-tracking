@@ -77,3 +77,31 @@ class CheckpointArrivals extends Table {
   @override
   Set<Column> get primaryKey => {id};
 }
+
+class RoutePois extends Table {
+  TextColumn get id => text()();
+  TextColumn get journeyId => text()();
+  TextColumn get name => text()();
+  TextColumn get category => text()(); // "restaurant", "rest_area", "nature", "fuel"
+  TextColumn get tags => text()();     // JSON string: {"cuisine":"vegetarian","rating":4.5}
+  RealColumn get latitude => real()();
+  RealColumn get longitude => real()();
+  RealColumn get rating => real().nullable()();
+  TextColumn get address => text().nullable()();
+  TextColumn get source => text()(); // "google_places" or "openstreetmap"
+  DateTimeColumn get fetchedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class ChatMessages extends Table {
+  TextColumn get id => text()();
+  TextColumn get journeyId => text()();
+  TextColumn get role => text()(); // "user" or "assistant"
+  TextColumn get content => text()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}

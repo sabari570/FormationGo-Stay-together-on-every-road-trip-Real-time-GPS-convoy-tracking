@@ -21,6 +21,8 @@ part 'app_database.g.dart';
     MemberLocations,
     Checkpoints,
     CheckpointArrivals,
+    RoutePois,
+    ChatMessages,
   ],
   daos: [
     DeviceProfileDao,
@@ -31,7 +33,17 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.createTable(routePois);
+            await m.createTable(chatMessages);
+          }
+        },
+      );
 }
 
 LazyDatabase _openConnection() {

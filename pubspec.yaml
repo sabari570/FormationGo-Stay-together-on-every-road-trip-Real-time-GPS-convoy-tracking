@@ -73,6 +73,10 @@ dependencies:
   share_plus: ^10.0.0
   http: ^1.2.2
 
+  # AI Chatbot & Polyline decoding
+  google_generative_ai: ^0.4.6
+  flutter_polyline_points: ^2.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

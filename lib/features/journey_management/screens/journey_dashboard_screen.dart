@@ -19,6 +19,8 @@ import '../widgets/journey_setup_sheet.dart';
 import '../widgets/invite_sheet.dart';
 import '../widgets/place_search_sheet.dart';
 import 'package:geolocator/geolocator.dart';
+import '../../chatbot/widgets/chatbot_fab.dart';
+import '../../chatbot/providers/chatbot_provider.dart';
 
 // ---------------------------------------------------------------------------
 // DummyMember — simulates a convoy member for development/demo purposes.
@@ -189,7 +191,7 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
   }
 
   void _fetchRoute(
-      double startLat, double startLng, double destLat, double destLng) async {
+      double startLat, double startLng, double destLat, double destLng, JourneyEntity journey) async {
     if (_fetchingRoute || _routePoints.isNotEmpty) return;
 
     setState(() {
@@ -210,6 +212,9 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
         _fitRouteBounds();
         // Seed dummy members once route is available
         _initializeDummyMembers();
+
+        // Trigger background pipeline to fetch and cache POIs for chatbot
+        ref.read(routePipelineServiceProvider).initializeForJourney(journey);
       }
     } catch (e) {
       // Quietly fail or show a light warning
@@ -1271,6 +1276,7 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
               journey.sourceLng!,
               journey.destinationLat!,
               journey.destinationLng!,
+              journey,
             );
           }
 
@@ -1384,6 +1390,13 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
                     right: 20.w,
                     child: _buildBottomOverlay(journey),
                   ),
+
+              if (isRouteConfigured)
+                Positioned(
+                  bottom: 100.h,
+                  right: 20.w,
+                  child: ChatbotFab(journeyId: journey.id),
+                ),
             ],
           );
         },

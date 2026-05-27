@@ -6,7 +6,7 @@ part of 'place_search_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$placeSearchHash() => r'e34218e683f5bca8afc242c92726195a61b0eaa8';
+String _$placeSearchHash() => r'afc1e6fcf2af221620d118f71c6720f01c85d61f';
 
 /// See also [PlaceSearch].
 @ProviderFor(PlaceSearch)

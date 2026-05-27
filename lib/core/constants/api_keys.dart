@@ -5,5 +5,5 @@ class ApiKeys {
   static const openWeatherMap =
       'YOUR_OPENWEATHERMAP_KEY'; // free at openweathermap.org/api
   static const geminiApiKey =
-      'AIzaSyDHHUFG9X2d5gh8CUzN2vG4ggvbehNx5lQ'; // free at gemini.com
+      'AIzaSyB61JnBmviabgll8T-WQRsVLbCEdHKraGY'; // free at gemini.com
 }

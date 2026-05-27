@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import '../../../core/constants/api_keys.dart';
 
 part 'place_search_provider.g.dart';
 
@@ -13,13 +12,6 @@ class PlacePrediction {
     required this.description,
     required this.placeId,
   });
-
-  factory PlacePrediction.fromJson(Map<String, dynamic> json) {
-    return PlacePrediction(
-      description: json['description'] as String,
-      placeId: json['place_id'] as String,
-    );
-  }
 }
 
 class PlaceDetails {
@@ -36,6 +28,9 @@ class PlaceDetails {
 
 @riverpod
 class PlaceSearch extends _$PlaceSearch {
+  // In-memory cache: populated during search so getDetails is instant (no 2nd request)
+  final Map<String, PlaceDetails> _detailsCache = {};
+
   @override
   AsyncValue<List<PlacePrediction>> build() {
     return const AsyncValue.data([]);
@@ -49,31 +44,48 @@ class PlaceSearch extends _$PlaceSearch {
 
     state = const AsyncValue.loading();
     try {
+      // Nominatim OpenStreetMap – free, no billing required
       final url = Uri.parse(
-        'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeComponent(query)}&key=${ApiKeys.googleMaps}',
+        'https://nominatim.openstreetmap.org/search'
+        '?q=${Uri.encodeComponent(query)}'
+        '&format=json'
+        '&limit=7'
+        '&addressdetails=1',
       );
 
-      final response = await http.get(url);
-      // ignore: avoid_print
-      print('[PlaceSearch] autocomplete status=${response.statusCode} body=${response.body}');
+      final response = await http.get(url, headers: {
+        // Nominatim requires a meaningful User-Agent
+        'User-Agent': 'FormationGo/1.0 (convoy-tracking-app)',
+        'Accept-Language': 'en',
+      });
+
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 'OK') {
-          final predictions = (data['predictions'] as List)
-              .map((p) => PlacePrediction.fromJson(p))
-              .toList();
-          state = AsyncValue.data(predictions);
-        } else if (data['status'] == 'ZERO_RESULTS') {
-          state = const AsyncValue.data([]);
-        } else {
-          state = AsyncValue.error(
-            Exception('Places API Error: ${data['status']} - ${data['error_message'] ?? ""}'),
-            StackTrace.current,
+        final List<dynamic> data = json.decode(response.body);
+        final predictions = <PlacePrediction>[];
+
+        for (final item in data) {
+          final placeId = item['place_id'].toString();
+          final displayName = item['display_name'] as String;
+          final lat = double.parse(item['lat'] as String);
+          final lon = double.parse(item['lon'] as String);
+
+          // Cache lat/lon immediately so getDetails is O(1)
+          _detailsCache[placeId] = PlaceDetails(
+            name: displayName.split(',').first.trim(),
+            latitude: lat,
+            longitude: lon,
           );
+
+          predictions.add(PlacePrediction(
+            description: displayName,
+            placeId: placeId,
+          ));
         }
+
+        state = AsyncValue.data(predictions);
       } else {
         state = AsyncValue.error(
-          Exception('Failed to load predictions: ${response.statusCode}'),
+          Exception('Geocoding request failed: HTTP ${response.statusCode}'),
           StackTrace.current,
         );
       }
@@ -82,38 +94,40 @@ class PlaceSearch extends _$PlaceSearch {
     }
   }
 
+  /// Returns details from the in-memory cache (always populated during search).
+  /// Falls back to a Nominatim lookup if the cache is somehow cold.
   Future<PlaceDetails> getDetails(String placeId) async {
+    if (_detailsCache.containsKey(placeId)) {
+      return _detailsCache[placeId]!;
+    }
+
+    // Fallback: reverse-lookup via Nominatim details endpoint
     final url = Uri.parse(
-      'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&fields=name,geometry&key=${ApiKeys.googleMaps}',
+      'https://nominatim.openstreetmap.org/details'
+      '?place_id=$placeId'
+      '&format=json',
     );
 
-    final response = await http.get(url);
-    // Debug: log the raw response so we can diagnose API errors
-    // ignore: avoid_print
-    print('[PlaceSearch] getDetails status=${response.statusCode} body=${response.body}');
+    final response = await http.get(url, headers: {
+      'User-Agent': 'FormationGo/1.0 (convoy-tracking-app)',
+    });
 
-    if (response.statusCode != 200) {
-      throw Exception('Network error: HTTP ${response.statusCode}');
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final centroid = data['centroid'] as Map<String, dynamic>?;
+      final coordinates = centroid?['coordinates'] as List<dynamic>?;
+      if (coordinates != null && coordinates.length >= 2) {
+        final lon = (coordinates[0] as num).toDouble();
+        final lat = (coordinates[1] as num).toDouble();
+        final localname = data['localname'] as String? ?? 'Location';
+        return PlaceDetails(name: localname, latitude: lat, longitude: lon);
+      }
     }
 
-    final data = json.decode(response.body) as Map<String, dynamic>;
-    final status = data['status'] as String;
+    throw Exception('Could not resolve place details. Please try searching again.');
+  }
 
-    if (status != 'OK') {
-      final msg = data['error_message'] as String? ?? status;
-      throw Exception('Places API error: $msg');
-    }
-
-    final result = data['result'] as Map<String, dynamic>;
-    final name = result['name'] as String;
-    final location = (result['geometry'] as Map<String, dynamic>)['location'] as Map<String, dynamic>;
-    final lat = (location['lat'] as num).toDouble();
-    final lng = (location['lng'] as num).toDouble();
-
-    return PlaceDetails(
-      name: name,
-      latitude: lat,
-      longitude: lng,
-    );
+  void clear() {
+    state = const AsyncValue.data([]);
   }
 }
