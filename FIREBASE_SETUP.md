@@ -66,8 +66,24 @@ flutter run
 
 Verify: console shows `Firebase: anonymous sign-in OK (...)` and creating a journey adds a doc under `journeys` in Firestore.
 
-## 9. Create composite index (when prompted)
+## 9. Create composite indexes (when prompted)
 
-If join-by-passcode fails, Firebase Console will show a link to create an index on:
+Firebase Console may prompt you to create indexes when queries fail. Required indexes:
+
+### Join by passcode (`join_codes` collection)
+
+- Collection: `join_codes`
+- Document ID lookup only (no composite index needed)
+
+### Created and joined tours on home screen
+
+The home screen reads a per-device index at `device_journeys/{deviceId}/refs/{journeyId}` (written on create, join, or when opening a journey dashboard). No collection group index is required.
+
+On app launch, stale refs pointing at deleted journeys are removed automatically so wiping Firestore collections in the console does not break the home screen.
+
+If you previously created journeys before this index existed, open each journey once from the dashboard to backfill its ref, or create a new journey.
+
+### Legacy passcode query (if still used)
+
 - Collection: `journeys`
 - Fields: `passCode` (Ascending), `status` (Ascending)

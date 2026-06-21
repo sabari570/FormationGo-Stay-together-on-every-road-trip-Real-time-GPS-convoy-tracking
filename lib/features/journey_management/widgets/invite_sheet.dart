@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/join_qr_codec.dart';
 
 class InviteSheet extends StatelessWidget {
   final String journeyName;
@@ -15,10 +16,13 @@ class InviteSheet extends StatelessWidget {
   });
 
   void _shareInvite() {
+    final qrPayload = JoinQrCodec.encodeJoinQr(passCode);
     final message = 'Join my convoy on FormationGo!\n'
         'Journey: $journeyName\n'
         'Passcode: $passCode\n\n'
-        'Enter this passcode in the app to track each other in real-time!';
+        'Open FormationGo and tap Join Journey → Scan QR Code, '
+        'or enter the passcode manually.\n\n'
+        'QR payload: $qrPayload';
     
     Share.share(message);
   }
@@ -84,7 +88,7 @@ class InviteSheet extends StatelessWidget {
                 ],
               ),
               child: QrImageView(
-                data: passCode,
+                data: JoinQrCodec.encodeJoinQr(passCode),
                 version: QrVersions.auto,
                 size: 180.w,
                 gapless: false,

@@ -7,6 +7,7 @@ import '../../features/onboarding/screens/profile_creation_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/journey_management/screens/create_journey_screen.dart';
 import '../../features/journey_management/screens/join_journey_screen.dart';
+import '../../features/journey_management/screens/qr_scan_screen.dart';
 import '../../features/journey_management/screens/journey_dashboard_screen.dart';
 import '../../features/chatbot/screens/chatbot_screen.dart';
 import '../../features/group_chat/screens/group_chat_screen.dart';
@@ -40,6 +41,10 @@ GoRouter appRouter(AppRouterRef ref) {
       GoRoute(
         path: '/join-journey',
         builder: (context, state) => const JoinJourneyScreen(),
+      ),
+      GoRoute(
+        path: '/scan-qr',
+        builder: (context, state) => const QrScanScreen(),
       ),
       GoRoute(
         path: '/journey/:id',

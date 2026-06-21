@@ -12,6 +12,10 @@ class MemberRepositoryImpl implements MemberRepository {
       _datasource.addMember(member);
 
   @override
+  Future<JourneyMemberEntity?> getMember(String journeyId, String deviceId) =>
+      _datasource.getMember(journeyId, deviceId);
+
+  @override
   Future<List<JourneyMemberEntity>> getMembers(String journeyId) =>
       _datasource.getMembers(journeyId);
 

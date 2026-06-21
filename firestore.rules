@@ -1,36 +1,73 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function memberAuthDoc(journeyId) {
+      return get(/databases/$(database)/documents/journeys/$(journeyId)/member_auth/$(request.auth.uid));
+    }
+
     function isJourneyMember(journeyId) {
       return request.auth != null
-        && exists(/databases/$(database)/documents/journeys/$(journeyId)/member_auth/$(request.auth.uid));
+        && exists(/databases/$(database)/documents/journeys/$(journeyId)/member_auth/$(request.auth.uid))
+        && memberAuthDoc(journeyId).data.deviceId is string
+        && exists(/databases/$(database)/documents/journeys/$(journeyId)/members/$(memberAuthDoc(journeyId).data.deviceId));
+    }
+
+    function isJourneyHost(journeyId) {
+      return isJourneyMember(journeyId)
+        && get(/databases/$(database)/documents/journeys/$(journeyId)/members/$(memberAuthDoc(journeyId).data.deviceId)).data.role == 'host';
+    }
+
+    match /join_codes/{passCode} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;
+      allow delete: if false;
+    }
+
+    match /device_journeys/{deviceId}/refs/{journeyId} {
+      allow read, write: if request.auth != null;
     }
 
     match /journeys/{journeyId} {
-      allow read: if request.auth != null;
+      allow read: if isJourneyMember(journeyId);
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null;
+      allow update, delete: if isJourneyHost(journeyId);
 
       match /members/{memberId} {
-        allow read, write: if request.auth != null;
-      }
-      match /member_auth/{authUid} {
         allow read: if request.auth != null;
-        allow create, update: if request.auth != null && request.auth.uid == authUid;
+        allow create: if request.auth != null
+          && request.resource.data.deviceId == memberId
+          && request.resource.data.journeyId == journeyId;
+        allow update: if isJourneyMember(journeyId)
+          && (memberId == memberAuthDoc(journeyId).data.deviceId || isJourneyHost(journeyId));
+        allow delete: if isJourneyHost(journeyId);
+      }
+
+      match /member_auth/{authUid} {
+        allow read: if request.auth != null && request.auth.uid == authUid;
+        allow create, update: if request.auth != null
+          && request.auth.uid == authUid
+          && request.resource.data.deviceId is string
+          && exists(/databases/$(database)/documents/journeys/$(journeyId)/members/$(request.resource.data.deviceId));
         allow delete: if false;
       }
+
       match /locations/{memberId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if isJourneyMember(journeyId);
       }
+
       match /checkpoints/{cpId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if isJourneyMember(journeyId);
       }
+
       match /route_pois/{poiId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if isJourneyMember(journeyId);
       }
+
       match /chat_messages/{msgId} {
-        allow read, write: if request.auth != null;
+        allow read, create: if isJourneyMember(journeyId);
+        allow update, delete: if false;
       }
+
       match /group_messages/{msgId} {
         allow read, create: if isJourneyMember(journeyId);
         allow update, delete: if false;

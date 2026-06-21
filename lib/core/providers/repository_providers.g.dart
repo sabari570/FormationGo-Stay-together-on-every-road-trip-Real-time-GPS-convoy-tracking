@@ -23,7 +23,7 @@ final deviceProfileRepositoryProvider =
 );
 
 typedef DeviceProfileRepositoryRef = ProviderRef<DeviceProfileRepository>;
-String _$journeyRepositoryHash() => r'39b0b190834a4bd19489fb5add92e1b87cafd5ad';
+String _$journeyRepositoryHash() => r'f2fe6c87c3b769e5a9e5b376b9eebb7f18819060';
 
 /// See also [journeyRepository].
 @ProviderFor(journeyRepository)

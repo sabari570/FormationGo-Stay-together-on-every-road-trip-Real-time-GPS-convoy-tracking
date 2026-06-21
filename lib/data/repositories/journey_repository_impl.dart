@@ -20,6 +20,14 @@ class JourneyRepositoryImpl implements JourneyRepository {
   Stream<List<JourneyEntity>> watchJourneys() => _journeyDs.watchJourneys();
 
   @override
+  Stream<List<JourneyEntity>> watchCreatedJourneys(String deviceId) =>
+      _journeyDs.watchCreatedJourneys(deviceId);
+
+  @override
+  Stream<List<JourneyEntity>> watchJoinedJourneys(String deviceId) =>
+      _journeyDs.watchJoinedJourneys(deviceId);
+
+  @override
   Stream<JourneyEntity?> watchJourney(String id) => _journeyDs.watchJourney(id);
 
   @override
@@ -27,7 +35,28 @@ class JourneyRepositoryImpl implements JourneyRepository {
       _journeyDs.saveJourney(journey);
 
   @override
-  Future<void> deleteJourney(String id) => _journeyDs.deleteJourney(id);
+  Future<void> ensureDeviceJourneyRef({
+    required String deviceId,
+    required String journeyId,
+    required String role,
+  }) =>
+      _journeyDs.ensureDeviceJourneyRef(
+        deviceId: deviceId,
+        journeyId: journeyId,
+        role: role,
+      );
+
+  @override
+  Future<void> pruneStaleDeviceJourneyRefs(String deviceId) =>
+      _journeyDs.pruneStaleDeviceJourneyRefs(deviceId);
+
+  @override
+  Future<void> deleteJourney(String id, {String? hostDeviceId}) =>
+      _journeyDs.deleteJourney(id, hostDeviceId: hostDeviceId);
+
+  @override
+  Future<String?> resolveJourneyIdFromPasscode(String passCode) =>
+      _journeyDs.resolveJourneyIdFromPasscode(passCode);
 
   @override
   Future<JourneyEntity?> findByPasscode(String passCode) =>

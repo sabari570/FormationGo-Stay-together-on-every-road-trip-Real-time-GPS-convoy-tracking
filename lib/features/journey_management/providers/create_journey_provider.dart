@@ -62,6 +62,14 @@ class CreateJourney extends _$CreateJourney {
             );
       }
 
+      await repo.ensureDeviceJourneyRef(
+        deviceId: hostId,
+        journeyId: journey.id,
+        role: 'host',
+      );
+
+      ref.invalidate(homeJourneyIndexReadyProvider);
+
       state = AsyncValue.data(journey);
     } catch (e, st) {
       state = AsyncValue.error(e, st);

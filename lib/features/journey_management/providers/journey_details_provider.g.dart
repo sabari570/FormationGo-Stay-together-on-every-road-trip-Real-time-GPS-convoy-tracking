@@ -6,8 +6,8 @@ part of 'journey_details_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$watchJourneyDetailsHash() =>
-    r'efe0c73a4c2c94134de3497db026b1d65fd42951';
+String _$ensureDeviceJourneyIndexHash() =>
+    r'4acd704ad61838d2d473b1e23cc13562a43474b8';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -29,6 +29,138 @@ class _SystemHash {
     return 0x1fffffff & (hash + ((0x00003fff & hash) << 15));
   }
 }
+
+/// See also [ensureDeviceJourneyIndex].
+@ProviderFor(ensureDeviceJourneyIndex)
+const ensureDeviceJourneyIndexProvider = EnsureDeviceJourneyIndexFamily();
+
+/// See also [ensureDeviceJourneyIndex].
+class EnsureDeviceJourneyIndexFamily extends Family<AsyncValue<void>> {
+  /// See also [ensureDeviceJourneyIndex].
+  const EnsureDeviceJourneyIndexFamily();
+
+  /// See also [ensureDeviceJourneyIndex].
+  EnsureDeviceJourneyIndexProvider call(
+    String journeyId,
+  ) {
+    return EnsureDeviceJourneyIndexProvider(
+      journeyId,
+    );
+  }
+
+  @override
+  EnsureDeviceJourneyIndexProvider getProviderOverride(
+    covariant EnsureDeviceJourneyIndexProvider provider,
+  ) {
+    return call(
+      provider.journeyId,
+    );
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'ensureDeviceJourneyIndexProvider';
+}
+
+/// See also [ensureDeviceJourneyIndex].
+class EnsureDeviceJourneyIndexProvider extends AutoDisposeFutureProvider<void> {
+  /// See also [ensureDeviceJourneyIndex].
+  EnsureDeviceJourneyIndexProvider(
+    String journeyId,
+  ) : this._internal(
+          (ref) => ensureDeviceJourneyIndex(
+            ref as EnsureDeviceJourneyIndexRef,
+            journeyId,
+          ),
+          from: ensureDeviceJourneyIndexProvider,
+          name: r'ensureDeviceJourneyIndexProvider',
+          debugGetCreateSourceHash:
+              const bool.fromEnvironment('dart.vm.product')
+                  ? null
+                  : _$ensureDeviceJourneyIndexHash,
+          dependencies: EnsureDeviceJourneyIndexFamily._dependencies,
+          allTransitiveDependencies:
+              EnsureDeviceJourneyIndexFamily._allTransitiveDependencies,
+          journeyId: journeyId,
+        );
+
+  EnsureDeviceJourneyIndexProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.journeyId,
+  }) : super.internal();
+
+  final String journeyId;
+
+  @override
+  Override overrideWith(
+    FutureOr<void> Function(EnsureDeviceJourneyIndexRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: EnsureDeviceJourneyIndexProvider._internal(
+        (ref) => create(ref as EnsureDeviceJourneyIndexRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        journeyId: journeyId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeFutureProviderElement<void> createElement() {
+    return _EnsureDeviceJourneyIndexProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is EnsureDeviceJourneyIndexProvider &&
+        other.journeyId == journeyId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, journeyId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+mixin EnsureDeviceJourneyIndexRef on AutoDisposeFutureProviderRef<void> {
+  /// The parameter `journeyId` of this provider.
+  String get journeyId;
+}
+
+class _EnsureDeviceJourneyIndexProviderElement
+    extends AutoDisposeFutureProviderElement<void>
+    with EnsureDeviceJourneyIndexRef {
+  _EnsureDeviceJourneyIndexProviderElement(super.provider);
+
+  @override
+  String get journeyId =>
+      (origin as EnsureDeviceJourneyIndexProvider).journeyId;
+}
+
+String _$watchJourneyDetailsHash() =>
+    r'efe0c73a4c2c94134de3497db026b1d65fd42951';
 
 /// See also [watchJourneyDetails].
 @ProviderFor(watchJourneyDetails)

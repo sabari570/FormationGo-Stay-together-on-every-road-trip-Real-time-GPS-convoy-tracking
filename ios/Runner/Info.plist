@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>FormationGo needs camera access to scan QR codes and join convoys.</string>
 </dict>
 </plist>

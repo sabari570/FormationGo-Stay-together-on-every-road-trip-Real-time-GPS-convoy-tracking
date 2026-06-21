@@ -23,6 +23,12 @@ class FirestoreMemberDatasource {
     });
   }
 
+  Future<JourneyMemberEntity?> getMember(String journeyId, String deviceId) async {
+    final doc = await _members(journeyId).doc(deviceId).get();
+    if (!doc.exists || doc.data() == null) return null;
+    return _fromMap(doc);
+  }
+
   Future<List<JourneyMemberEntity>> getMembers(String journeyId) async {
     final snapshot = await _members(journeyId).get();
     return snapshot.docs.map(_fromMap).toList();
@@ -34,8 +40,8 @@ class FirestoreMemberDatasource {
         );
   }
 
-  JourneyMemberEntity _fromMap(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data();
+  JourneyMemberEntity _fromMap(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data()!;
     return JourneyMemberEntity(
       id: data['id'] as String? ?? doc.id,
       journeyId: data['journeyId'] as String,

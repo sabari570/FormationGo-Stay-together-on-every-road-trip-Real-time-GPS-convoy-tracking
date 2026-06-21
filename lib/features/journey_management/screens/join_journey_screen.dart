@@ -65,85 +65,8 @@ class _JoinJourneyScreenState extends ConsumerState<JoinJourneyScreen> {
     }
   }
 
-  void _simulateQRScan() {
-    // Show a premium mock QR scanner dialog for testing/demo
-    showDialog(
-      context: context,
-      builder: (context) {
-        final mockController = TextEditingController();
-        return AlertDialog(
-          backgroundColor: AppColors.bg1,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20.r),
-            side: const BorderSide(color: AppColors.border),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.qr_code_scanner, color: AppColors.convoyBlue, size: 24.w),
-              SizedBox(width: 10.w),
-              Text(
-                'Scan QR Code',
-                style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Enter the passcode from the QR code (simulation):',
-                style: TextStyle(color: Colors.grey[400], fontSize: 13.sp),
-              ),
-              SizedBox(height: 16.h),
-              TextField(
-                controller: mockController,
-                keyboardType: TextInputType.number,
-                maxLength: 6,
-                style: const TextStyle(color: Colors.white, letterSpacing: 4),
-                decoration: InputDecoration(
-                  counterText: '',
-                  hintText: '123456',
-                  hintStyle: TextStyle(color: Colors.grey[600]),
-                  filled: true,
-                  fillColor: AppColors.bg0,
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.r),
-                    borderSide: const BorderSide(color: AppColors.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.r),
-                    borderSide: const BorderSide(color: AppColors.convoyBlue),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final pin = mockController.text.trim();
-                Navigator.of(context).pop();
-                if (pin.length == 6) {
-                  _pinController.text = pin;
-                  _submit();
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.convoyBlue,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-              ),
-              child: const Text('Scan'),
-            ),
-          ],
-        );
-      },
-    );
+  void _openQrScanner() {
+    context.push('/scan-qr');
   }
 
   @override
@@ -218,7 +141,7 @@ class _JoinJourneyScreenState extends ConsumerState<JoinJourneyScreen> {
                 width: double.infinity,
                 height: 56.h,
                 child: OutlinedButton.icon(
-                  onPressed: _simulateQRScan,
+                  onPressed: _openQrScanner,
                   icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
                   label: const Text(
                     'Scan QR Code',

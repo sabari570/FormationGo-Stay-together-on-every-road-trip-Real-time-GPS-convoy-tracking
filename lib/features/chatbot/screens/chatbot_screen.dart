@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../home/providers/home_provider.dart';
 import '../providers/chatbot_provider.dart';
 import '../widgets/chat_bubble.dart';
 
@@ -63,6 +64,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     final isIndexing = ref.watch(chatbotPoisLoadingProvider(widget.journeyId));
     final indexingFailed =
         ref.watch(chatbotIndexingFailedProvider(widget.journeyId));
+    final isMember = ref.watch(isJourneyMemberProvider(widget.journeyId));
 
     // Scroll to bottom when list is loaded or updated
     ref.listen(chatbotMessagesNotifierProvider(widget.journeyId), (prev, next) {
@@ -143,7 +145,21 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: !isMember
+          ? Center(
+              child: Padding(
+                padding: EdgeInsets.all(32.w),
+                child: Text(
+                  'Join this tour to use the AI tour guide.',
+                  style: TextStyle(
+                    color: AppColors.convoyNeutral,
+                    fontSize: 14.sp,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            )
+          : Column(
         children: [
           Expanded(
             child: SafeArea(

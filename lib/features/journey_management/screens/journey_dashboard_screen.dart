@@ -49,6 +49,9 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    Future.microtask(
+      () => ref.read(ensureDeviceJourneyIndexProvider(widget.journeyId)),
+    );
   }
 
   @override

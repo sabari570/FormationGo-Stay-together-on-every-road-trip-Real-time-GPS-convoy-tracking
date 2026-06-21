@@ -3,12 +3,33 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/providers/device_identity_provider.dart';
 import '../../../core/providers/repository_providers.dart';
 import '../../../domain/entities/journey.dart';
 import '../providers/home_provider.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   Color _fromHex(String hexString) {
     final buffer = StringBuffer();
@@ -75,14 +96,78 @@ class HomeScreen extends ConsumerWidget {
     );
 
     if (confirmed == true) {
-      await ref.read(journeyRepositoryProvider).deleteJourney(journey.id);
+      final deviceId = ref.read(deviceIdProvider);
+      await ref.read(journeyRepositoryProvider).deleteJourney(
+            journey.id,
+            hostDeviceId: deviceId,
+          );
     }
   }
 
+  Widget _buildJourneyList({
+    required AsyncValue<List<JourneyEntity>> journeysAsync,
+    required String emptyMessage,
+    required bool showDelete,
+  }) {
+    return journeysAsync.when(
+      data: (journeys) {
+        if (journeys.isEmpty) {
+          return Center(
+            child: Text(
+              emptyMessage,
+              style: TextStyle(color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
+          );
+        }
+        return ListView.builder(
+          itemCount: journeys.length,
+          itemBuilder: (context, index) {
+            final journey = journeys[index];
+            return Card(
+              color: AppColors.bg1,
+              margin: EdgeInsets.only(bottom: 12.h),
+              child: ListTile(
+                title: Text(
+                  journey.name,
+                  style: const TextStyle(color: Colors.white),
+                ),
+                subtitle: Text(
+                  journey.createdAt.toString().split(' ')[0],
+                  style: TextStyle(color: Colors.grey[400]),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (showDelete)
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline,
+                            color: Colors.redAccent),
+                        onPressed: () =>
+                            _confirmDeleteJourney(context, ref, journey),
+                      ),
+                    const Icon(Icons.chevron_right, color: Colors.grey),
+                  ],
+                ),
+                onTap: () {
+                  context.push('/journey/${journey.id}');
+                },
+              ),
+            );
+          },
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) =>
+          const Center(child: Text('Failed to load journeys')),
+    );
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final profileAsync = ref.watch(currentProfileProvider);
-    final journeysAsync = ref.watch(recentJourneysProvider);
+    final createdAsync = ref.watch(createdJourneysProvider);
+    final joinedAsync = ref.watch(joinedJourneysProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -175,67 +260,33 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              SizedBox(height: 40.h),
-              Text(
-                'Recent Journeys',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+              SizedBox(height: 32.h),
+              TabBar(
+                controller: _tabController,
+                indicatorColor: AppColors.convoyGreen,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.grey[500],
+                tabs: const [
+                  Tab(text: 'My Tours'),
+                  Tab(text: 'Joined'),
+                ],
               ),
               SizedBox(height: 16.h),
               Expanded(
-                child: journeysAsync.when(
-                  data: (journeys) {
-                    if (journeys.isEmpty) {
-                      return Center(
-                        child: Text(
-                          'No recent journeys.',
-                          style: TextStyle(color: Colors.grey[500]),
-                        ),
-                      );
-                    }
-                    return ListView.builder(
-                      itemCount: journeys.length,
-                      itemBuilder: (context, index) {
-                        final journey = journeys[index];
-                        return Card(
-                          color: AppColors.bg1,
-                          margin: EdgeInsets.only(bottom: 12.h),
-                          child: ListTile(
-                            title: Text(
-                              journey.name,
-                              style: const TextStyle(color: Colors.white),
-                            ),
-                            subtitle: Text(
-                              journey.createdAt.toString().split(' ')[0],
-                              style: TextStyle(color: Colors.grey[400]),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline,
-                                      color: Colors.redAccent),
-                                  onPressed: () => _confirmDeleteJourney(
-                                      context, ref, journey),
-                                ),
-                                const Icon(Icons.chevron_right,
-                                    color: Colors.grey),
-                              ],
-                            ),
-                            onTap: () {
-                              context.push('/journey/${journey.id}');
-                            },
-                          ),
-                        );
-                      },
-                    );
-                  },
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (_, __) =>
-                      const Center(child: Text('Failed to load journeys')),
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildJourneyList(
+                      journeysAsync: createdAsync,
+                      emptyMessage: 'No tours created yet.\nTap Create Journey to start one.',
+                      showDelete: true,
+                    ),
+                    _buildJourneyList(
+                      journeysAsync: joinedAsync,
+                      emptyMessage: 'No joined tours yet.\nJoin a convoy with a passcode or QR code.',
+                      showDelete: false,
+                    ),
+                  ],
                 ),
               ),
             ],

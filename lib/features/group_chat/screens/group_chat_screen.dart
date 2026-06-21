@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/providers/device_identity_provider.dart';
+import '../../home/providers/home_provider.dart';
 import '../providers/group_chat_provider.dart';
 import '../widgets/group_message_bubble.dart';
 
@@ -62,6 +63,7 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> {
     final messagesAsync =
         ref.watch(groupChatMessagesProvider(widget.journeyId));
     final isReady = ref.watch(groupChatReadyProvider(widget.journeyId));
+    final isMember = ref.watch(isJourneyMemberProvider(widget.journeyId));
     final currentDeviceId = ref.watch(deviceIdProvider);
 
     ref.listen(groupChatMessagesProvider(widget.journeyId), (_, next) {
@@ -83,7 +85,21 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> {
         ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Column(
+      body: !isMember
+          ? Center(
+              child: Padding(
+                padding: EdgeInsets.all(32.w),
+                child: Text(
+                  'Join this tour to view convoy chat.',
+                  style: TextStyle(
+                    color: AppColors.convoyNeutral,
+                    fontSize: 14.sp,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            )
+          : Column(
         children: [
           Expanded(
             child: messagesAsync.when(

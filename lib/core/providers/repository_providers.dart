@@ -3,6 +3,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../data/datasources/firestore/firestore_chat_datasource.dart';
 import '../../data/datasources/firestore/firestore_checkpoint_datasource.dart';
 import '../../data/datasources/firestore/firestore_group_chat_datasource.dart';
+import '../../data/datasources/firestore/firestore_device_journey_datasource.dart';
+import '../../data/datasources/firestore/firestore_join_code_datasource.dart';
 import '../../data/datasources/firestore/firestore_journey_datasource.dart';
 import '../../data/datasources/firestore/firestore_location_datasource.dart';
 import '../../data/datasources/firestore/firestore_member_auth_datasource.dart';
@@ -37,8 +39,10 @@ DeviceProfileRepository deviceProfileRepository(
 @Riverpod(keepAlive: true)
 JourneyRepository journeyRepository(JourneyRepositoryRef ref) {
   final firestore = ref.watch(firestoreProvider);
+  final joinCodeDs = FirestoreJoinCodeDatasource(firestore);
+  final deviceJourneyDs = FirestoreDeviceJourneyDatasource(firestore);
   return JourneyRepositoryImpl(
-    FirestoreJourneyDatasource(firestore),
+    FirestoreJourneyDatasource(firestore, joinCodeDs, deviceJourneyDs),
     FirestoreCheckpointDatasource(firestore),
   );
 }
