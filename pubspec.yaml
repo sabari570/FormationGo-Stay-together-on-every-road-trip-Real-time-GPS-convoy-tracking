@@ -1,5 +1,5 @@
 name: formation_go
-description: "A new Flutter project."
+description: "Real-time motorcycle convoy tracking and coordination."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -78,6 +78,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
+  flutter_launcher_icons: ^0.14.3
   
   # Code Generation
   build_runner: 
@@ -92,3 +93,21 @@ flutter:
     - assets/lottie/
     - assets/fonts/
     - .env
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/images/app_icon.png
+  adaptive_icon_background: "#0A0E1A"
+  adaptive_icon_foreground: assets/images/app_icon.png
+  web:
+    generate: true
+    image_path: assets/images/app_icon.png
+    background_color: "#0A0E1A"
+    theme_color: "#00E676"
+  windows:
+    generate: true
+    image_path: assets/images/app_icon.png
+  macos:
+    generate: true
+    image_path: assets/images/app_icon.png

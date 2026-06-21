@@ -59,6 +59,12 @@ android {
             signingConfig signingConfigs.debug
         }
     }
+
+    applicationVariants.configureEach { variant ->
+        variant.outputs.configureEach { output ->
+            output.outputFileName = "FormationGo-${variant.versionName}-${variant.buildType.name}.apk"
+        }
+    }
 }
 
 flutter {
