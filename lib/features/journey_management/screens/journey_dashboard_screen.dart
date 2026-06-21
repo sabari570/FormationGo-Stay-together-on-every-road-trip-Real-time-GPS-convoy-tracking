@@ -6,7 +6,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/utils/relative_time.dart';
 import '../../../core/providers/device_identity_provider.dart';
 import '../../../core/providers/repository_providers.dart';
 import '../../../domain/entities/journey.dart';
@@ -15,6 +14,8 @@ import '../../../domain/entities/journey_member.dart';
 import '../../../domain/entities/member_location.dart';
 import '../../tracking/providers/location_provider.dart';
 import '../../tracking/providers/live_location_provider.dart';
+import '../../tracking/providers/member_proximity_provider.dart';
+import '../../tracking/utils/proximity_utils.dart';
 import '../../tracking/services/directions_service.dart';
 import '../../home/providers/home_provider.dart';
 import '../providers/journey_details_provider.dart';
@@ -897,24 +898,6 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
     );
   }
 
-  String _locationStatusLabel(MemberLocationEntity? location) {
-    if (location == null) return 'Waiting for GPS...';
-    final age = DateTime.now().difference(location.timestamp);
-    if (age > const Duration(minutes: 2)) {
-      return 'Last seen ${formatTimeAgo(age)}';
-    }
-    if (location.speed > 1)
-      return 'Moving • ${(location.speed * 3.6).toStringAsFixed(0)} km/h';
-    return 'Active - Tracking GPS';
-  }
-
-  Color _locationStatusColor(MemberLocationEntity? location) {
-    if (location == null) return Colors.grey;
-    final age = DateTime.now().difference(location.timestamp);
-    if (age > const Duration(minutes: 2)) return AppColors.convoyAmber;
-    return Colors.greenAccent;
-  }
-
   void _showMembersSheet(String journeyId, String currentDeviceId) {
     final profile = ref.read(currentProfileProvider).valueOrNull;
     final name = profile?.name ?? 'You';
@@ -932,6 +915,11 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
               ref.watch(journeyMembersProvider(journeyId)).valueOrNull ?? [];
           final locations =
               ref.watch(memberLocationsProvider(journeyId)).valueOrNull ?? [];
+          final proximityList =
+              ref.watch(memberProximityProvider(journeyId));
+          final proximityByDevice = {
+            for (final info in proximityList) info.member.deviceId: info,
+          };
           final locationByDevice = {
             for (final loc in locations) loc.deviceId: loc,
           };
@@ -975,48 +963,72 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
                 ...members.map((member) {
                   final isCurrent = member.deviceId == currentDeviceId;
                   final location = locationByDevice[member.deviceId];
+                  final proximity = proximityByDevice[member.deviceId];
                   final memberColor = _fromHex(member.avatarColor);
                   final memberInitial = member.name.isNotEmpty
                       ? member.name.substring(0, 1).toUpperCase()
                       : '?';
-                  final statusColor = _locationStatusColor(location);
+                  final statusColor = isCurrent
+                      ? AppColors.convoyGreen
+                      : (proximity != null &&
+                              proximity.status != ProximityStatus.unknown
+                          ? colorForStatus(proximity.status)
+                          : locationStatusColor(location));
+                  final subtitle = memberProximitySubtitle(
+                    isCurrentUser: isCurrent,
+                    location: location,
+                    distanceMeters: proximity?.distanceMeters,
+                  );
 
                   return Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: memberColor,
-                          child: Text(
-                            memberInitial,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border(
+                            left: BorderSide(
+                              color: isCurrent
+                                  ? Colors.transparent
+                                  : statusColor.withOpacity(0.8),
+                              width: 3.w,
                             ),
                           ),
                         ),
-                        title: Text(
-                          isCurrent ? '${member.name} (You)' : member.name,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight:
-                                isCurrent ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
-                        subtitle: Text(
-                          _locationStatusLabel(location),
-                          style: TextStyle(color: statusColor),
-                        ),
-                        trailing: member.role == 'host'
-                            ? const Icon(Icons.star, color: Colors.amber)
-                            : Container(
-                                width: 10.w,
-                                height: 10.h,
-                                decoration: BoxDecoration(
-                                  color: statusColor,
-                                  shape: BoxShape.circle,
-                                ),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: memberColor,
+                            child: Text(
+                              memberInitial,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
                               ),
+                            ),
+                          ),
+                          title: Text(
+                            isCurrent ? '${member.name} (You)' : member.name,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: isCurrent
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                          subtitle: Text(
+                            subtitle,
+                            style: TextStyle(color: statusColor),
+                          ),
+                          trailing: member.role == 'host'
+                              ? const Icon(Icons.star, color: Colors.amber)
+                              : Container(
+                                  width: 10.w,
+                                  height: 10.h,
+                                  decoration: BoxDecoration(
+                                    color: statusColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                        ),
                       ),
                       Divider(color: AppColors.border, height: 1.h),
                     ],
@@ -1044,8 +1056,8 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
                         ),
                       ),
                       subtitle: const Text(
-                        'Active - Tracking GPS',
-                        style: TextStyle(color: Colors.greenAccent),
+                        'Your location',
+                        style: TextStyle(color: AppColors.convoyGreen),
                       ),
                       trailing: const Icon(Icons.star, color: Colors.amber),
                     ),
@@ -1063,11 +1075,15 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
     List<CheckpointEntity> checkpoints,
     List<JourneyMemberEntity> members,
     List<MemberLocationEntity> locations,
+    List<MemberProximityInfo> proximityList,
     String currentDeviceId,
   ) {
     final markers = <ConvoyMapMarker>[];
     final locationByDevice = {
       for (final loc in locations) loc.deviceId: loc,
+    };
+    final proximityByDevice = {
+      for (final info in proximityList) info.member.deviceId: info,
     };
 
     if (journey.sourceLat != null && journey.sourceLng != null) {
@@ -1098,13 +1114,30 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
       final location = locationByDevice[member.deviceId];
       if (location == null) continue;
 
+      final proximity = proximityByDevice[member.deviceId];
+      final statusColor = proximity != null &&
+              proximity.status != ProximityStatus.unknown
+          ? colorForStatus(proximity.status)
+          : locationStatusColor(location);
+      final distanceLabel = proximity?.distanceMeters != null
+          ? formatDistanceLabel(proximity!.distanceMeters!)
+          : null;
+      final subtitle = distanceLabel ??
+          memberProximitySubtitle(
+            isCurrentUser: false,
+            location: location,
+            distanceMeters: proximity?.distanceMeters,
+          );
+
       markers.add(
         ConvoyMapMarker(
           id: member.deviceId,
           position: LatLng(location.latitude, location.longitude),
           color: _fromHex(member.avatarColor),
+          borderColor: statusColor,
           title: member.name,
-          subtitle: _locationStatusLabel(location),
+          subtitle: subtitle,
+          distanceLabel: distanceLabel,
           icon: Icons.person_pin_circle,
         ),
       );
@@ -1153,6 +1186,10 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
         ref.watch(journeyMembersProvider(widget.journeyId)).valueOrNull ?? [];
     final locations =
         ref.watch(memberLocationsProvider(widget.journeyId)).valueOrNull ?? [];
+    final proximityList =
+        ref.watch(memberProximityProvider(widget.journeyId));
+    final outOfRangeCount =
+        ref.watch(outOfRangeMemberCountProvider(widget.journeyId));
     final memberCount = members.isEmpty ? 1 : members.length;
 
     return Scaffold(
@@ -1198,9 +1235,14 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
                       checkpoints,
                       members,
                       locations,
+                      isRouteConfigured ? proximityList : const [],
                       currentDeviceId,
                     ),
                     currentPosition: latLng,
+                    proximityCircleCenter:
+                        isRouteConfigured ? latLng : null,
+                    proximityRadiusMeters:
+                        isRouteConfigured ? proximityRadiusMeters : null,
                     onLongPress: isHost ? _showAddCheckpointDialog : null,
                     onMapCreated: (controller) {
                       _mapController = controller;
@@ -1228,6 +1270,7 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
                     isRouteConfigured,
                     isHost,
                     memberCount,
+                    outOfRangeCount,
                   ),
                 ),
 
@@ -1318,6 +1361,7 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
     bool isRouteConfigured,
     bool isHost,
     int memberCount,
+    int outOfRangeCount,
   ) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
@@ -1366,6 +1410,19 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                if (isRouteConfigured && outOfRangeCount > 0) ...[
+                  SizedBox(height: 2.h),
+                  Text(
+                    outOfRangeCount == 1
+                        ? '1 member out of range'
+                        : '$outOfRangeCount members out of range',
+                    style: TextStyle(
+                      color: AppColors.convoyRed,
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

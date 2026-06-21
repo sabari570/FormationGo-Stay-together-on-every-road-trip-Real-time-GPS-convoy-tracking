@@ -10,16 +10,20 @@ class ConvoyMapMarker {
   final String id;
   final LatLng position;
   final Color color;
+  final Color? borderColor;
   final String title;
   final String? subtitle;
+  final String? distanceLabel;
   final IconData icon;
 
   const ConvoyMapMarker({
     required this.id,
     required this.position,
     required this.color,
+    this.borderColor,
     required this.title,
     this.subtitle,
+    this.distanceLabel,
     this.icon = Icons.place,
   });
 }
@@ -30,6 +34,8 @@ class ConvoyMap extends StatefulWidget {
   final List<LatLng> routePoints;
   final List<ConvoyMapMarker> markers;
   final LatLng? currentPosition;
+  final LatLng? proximityCircleCenter;
+  final double? proximityRadiusMeters;
   final void Function(LatLng point)? onLongPress;
   final void Function(MapController controller)? onMapCreated;
 
@@ -40,6 +46,8 @@ class ConvoyMap extends StatefulWidget {
     this.routePoints = const [],
     this.markers = const [],
     this.currentPosition,
+    this.proximityCircleCenter,
+    this.proximityRadiusMeters,
     this.onLongPress,
     this.onMapCreated,
   });
@@ -63,6 +71,10 @@ class _ConvoyMapState extends State<ConvoyMap> {
       ...widget.markers.map(_buildMarker),
       if (widget.currentPosition != null) _buildCurrentLocationMarker(),
     ];
+
+    final showProximityCircle = widget.proximityCircleCenter != null &&
+        widget.proximityRadiusMeters != null &&
+        widget.proximityRadiusMeters! > 0;
 
     return FlutterMap(
       mapController: _mapController,
@@ -89,6 +101,19 @@ class _ConvoyMapState extends State<ConvoyMap> {
               ),
             ],
           ),
+        if (showProximityCircle)
+          CircleLayer(
+            circles: [
+              CircleMarker(
+                point: widget.proximityCircleCenter!,
+                radius: widget.proximityRadiusMeters!,
+                useRadiusInMeter: true,
+                color: AppColors.convoyGreen.withOpacity(0.15),
+                borderColor: AppColors.convoyGreen.withOpacity(0.55),
+                borderStrokeWidth: 2.w,
+              ),
+            ],
+          ),
         MarkerLayer(markers: allMarkers),
         RichAttributionWidget(
           alignment: AttributionAlignment.bottomLeft,
@@ -104,16 +129,24 @@ class _ConvoyMapState extends State<ConvoyMap> {
   }
 
   Marker _buildMarker(ConvoyMapMarker data) {
+    final borderColor = data.borderColor ?? Colors.white;
+
     return Marker(
       point: data.position,
-      width: 40.w,
-      height: 50.h,
+      width: 72.w,
+      height: 72.h,
       child: GestureDetector(
         onTap: () {
-          if (data.subtitle == null) return;
+          if (data.subtitle == null && data.distanceLabel == null) return;
+          final lines = <String>[data.title];
+          if (data.distanceLabel != null) {
+            lines.add(data.distanceLabel!);
+          } else if (data.subtitle != null) {
+            lines.add(data.subtitle!);
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${data.title}\n${data.subtitle}'),
+              content: Text(lines.join('\n')),
               duration: const Duration(seconds: 2),
             ),
           );
@@ -126,7 +159,7 @@ class _ConvoyMapState extends State<ConvoyMap> {
               decoration: BoxDecoration(
                 color: data.color,
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2.w),
+                border: Border.all(color: borderColor, width: 2.5.w),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.35),
@@ -139,8 +172,25 @@ class _ConvoyMapState extends State<ConvoyMap> {
             ),
             Transform.translate(
               offset: Offset(0, -4.h),
-              child: Icon(Icons.arrow_drop_down, color: data.color, size: 18.w),
+              child: Icon(Icons.arrow_drop_down, color: borderColor, size: 18.w),
             ),
+            if (data.distanceLabel != null)
+              Container(
+                margin: EdgeInsets.only(top: 2.h),
+                padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.65),
+                  borderRadius: BorderRadius.circular(4.r),
+                ),
+                child: Text(
+                  data.distanceLabel!,
+                  style: TextStyle(
+                    color: borderColor,
+                    fontSize: 9.sp,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
