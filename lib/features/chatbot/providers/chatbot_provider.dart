@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/providers/repository_providers.dart';
 import '../../../domain/entities/chat_message.dart';
 import '../../../domain/entities/route_poi.dart';
+import '../../group_chat/providers/group_chat_provider.dart';
 import '../../journey_management/providers/journey_details_provider.dart';
 import '../models/route_poi_indexing_state.dart';
 import '../services/overpass_service.dart';
@@ -149,6 +150,8 @@ class ChatbotMessagesNotifier extends _$ChatbotMessagesNotifier {
       return;
     }
 
+    await ref.read(ensureGroupChatMemberAuthProvider(journeyId).future);
+
     final chatRepo = ref.read(chatRepositoryProvider);
     final currentMessages = state.valueOrNull ?? [];
 
@@ -222,6 +225,7 @@ class ChatbotMessagesNotifier extends _$ChatbotMessagesNotifier {
   }
 
   Future<void> clearHistory() async {
+    await ref.read(ensureGroupChatMemberAuthProvider(journeyId).future);
     await ref.read(chatRepositoryProvider).clearMessages(journeyId);
   }
 }

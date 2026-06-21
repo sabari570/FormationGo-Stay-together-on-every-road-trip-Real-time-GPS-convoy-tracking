@@ -64,8 +64,7 @@ service cloud.firestore {
       }
 
       match /chat_messages/{msgId} {
-        allow read, create: if isJourneyMember(journeyId);
-        allow update, delete: if false;
+        allow read, create, update, delete: if isJourneyMember(journeyId);
       }
 
       match /group_messages/{msgId} {

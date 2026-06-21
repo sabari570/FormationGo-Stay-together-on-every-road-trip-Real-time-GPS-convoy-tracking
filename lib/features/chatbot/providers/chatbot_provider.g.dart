@@ -887,7 +887,7 @@ class _RoutePoiIndexingStatusProviderElement
 }
 
 String _$chatbotMessagesNotifierHash() =>
-    r'9cd37c9001b5c0e17ef384f8bd7568af4fffa189';
+    r'ce838833f3d0885a1af34c40a57a49f8caae4866';
 
 abstract class _$ChatbotMessagesNotifier
     extends BuildlessAutoDisposeStreamNotifier<List<ChatMessageEntity>> {

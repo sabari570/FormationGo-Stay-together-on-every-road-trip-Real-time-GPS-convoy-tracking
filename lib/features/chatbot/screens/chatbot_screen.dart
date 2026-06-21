@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../home/providers/home_provider.dart';
+import '../../group_chat/providers/group_chat_provider.dart';
 import '../providers/chatbot_provider.dart';
 import '../widgets/chat_bubble.dart';
 
@@ -18,6 +19,14 @@ class ChatbotScreen extends ConsumerStatefulWidget {
 class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(
+      () => ref.read(ensureGroupChatMemberAuthProvider(widget.journeyId)),
+    );
+  }
 
   final List<String> _suggestions = [
     'Where can we eat?',
@@ -129,13 +138,22 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
                           backgroundColor: AppColors.convoyRed),
                       child: const Text('Clear',
                           style: TextStyle(color: Colors.white)),
-                      onPressed: () {
-                        ref
-                            .read(chatbotMessagesNotifierProvider(
-                                    widget.journeyId)
-                                .notifier)
-                            .clearHistory();
+                      onPressed: () async {
                         Navigator.pop(context);
+                        try {
+                          await ref
+                              .read(chatbotMessagesNotifierProvider(
+                                      widget.journeyId)
+                                  .notifier)
+                              .clearHistory();
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Could not clear chat: $e'),
+                            ),
+                          );
+                        }
                       },
                     ),
                   ],
