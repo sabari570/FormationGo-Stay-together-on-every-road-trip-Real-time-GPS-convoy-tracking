@@ -6,21 +6,6 @@ part of 'chatbot_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$placesServiceHash() => r'57530c7732326fd6adce5598366a6a7fa6a4620e';
-
-/// See also [placesService].
-@ProviderFor(placesService)
-final placesServiceProvider = AutoDisposeProvider<PlacesService>.internal(
-  placesService,
-  name: r'placesServiceProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$placesServiceHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef PlacesServiceRef = AutoDisposeProviderRef<PlacesService>;
 String _$overpassServiceHash() => r'787fd5112db023fad5c629ff19eb4b4e3c8e7b64';
 
 /// See also [overpassService].
@@ -36,23 +21,26 @@ final overpassServiceProvider = AutoDisposeProvider<OverpassService>.internal(
 );
 
 typedef OverpassServiceRef = AutoDisposeProviderRef<OverpassService>;
-String _$geminiServiceHash() => r'64d95d24f6661b758c8da4b62b7fe688b692898e';
+String _$routeAssistantServiceHash() =>
+    r'46d1f1729ef5d0b904ad93132d68affd2009d3d8';
 
-/// See also [geminiService].
-@ProviderFor(geminiService)
-final geminiServiceProvider = AutoDisposeProvider<GeminiService>.internal(
-  geminiService,
-  name: r'geminiServiceProvider',
+/// See also [routeAssistantService].
+@ProviderFor(routeAssistantService)
+final routeAssistantServiceProvider =
+    AutoDisposeProvider<RouteAssistantService>.internal(
+  routeAssistantService,
+  name: r'routeAssistantServiceProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
       ? null
-      : _$geminiServiceHash,
+      : _$routeAssistantServiceHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
-typedef GeminiServiceRef = AutoDisposeProviderRef<GeminiService>;
+typedef RouteAssistantServiceRef
+    = AutoDisposeProviderRef<RouteAssistantService>;
 String _$routePipelineServiceHash() =>
-    r'311a6a2811a292073cfe5ef59f0389bbe5460106';
+    r'4d6bfe8ba25d2ef11e859559b1dceec6741f498e';
 
 /// See also [routePipelineService].
 @ProviderFor(routePipelineService)
@@ -68,7 +56,22 @@ final routePipelineServiceProvider =
 );
 
 typedef RoutePipelineServiceRef = AutoDisposeProviderRef<RoutePipelineService>;
-String _$chatbotReadyHash() => r'fbf96391d6a7ace07c3a05382a530df7ab11725d';
+String _$chatbotAiEnabledHash() => r'0d590e1986e23787496e13ce537e332f37ec6081';
+
+/// See also [chatbotAiEnabled].
+@ProviderFor(chatbotAiEnabled)
+final chatbotAiEnabledProvider = AutoDisposeProvider<bool>.internal(
+  chatbotAiEnabled,
+  name: r'chatbotAiEnabledProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$chatbotAiEnabledHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef ChatbotAiEnabledRef = AutoDisposeProviderRef<bool>;
+String _$routePoisHash() => r'c46980bff80cf82095c895cf0af295161592e98a';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -91,12 +94,141 @@ class _SystemHash {
   }
 }
 
+/// See also [routePois].
+@ProviderFor(routePois)
+const routePoisProvider = RoutePoisFamily();
+
+/// See also [routePois].
+class RoutePoisFamily extends Family<AsyncValue<List<RoutePoiEntity>>> {
+  /// See also [routePois].
+  const RoutePoisFamily();
+
+  /// See also [routePois].
+  RoutePoisProvider call(
+    String journeyId,
+  ) {
+    return RoutePoisProvider(
+      journeyId,
+    );
+  }
+
+  @override
+  RoutePoisProvider getProviderOverride(
+    covariant RoutePoisProvider provider,
+  ) {
+    return call(
+      provider.journeyId,
+    );
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'routePoisProvider';
+}
+
+/// See also [routePois].
+class RoutePoisProvider
+    extends AutoDisposeStreamProvider<List<RoutePoiEntity>> {
+  /// See also [routePois].
+  RoutePoisProvider(
+    String journeyId,
+  ) : this._internal(
+          (ref) => routePois(
+            ref as RoutePoisRef,
+            journeyId,
+          ),
+          from: routePoisProvider,
+          name: r'routePoisProvider',
+          debugGetCreateSourceHash:
+              const bool.fromEnvironment('dart.vm.product')
+                  ? null
+                  : _$routePoisHash,
+          dependencies: RoutePoisFamily._dependencies,
+          allTransitiveDependencies: RoutePoisFamily._allTransitiveDependencies,
+          journeyId: journeyId,
+        );
+
+  RoutePoisProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.journeyId,
+  }) : super.internal();
+
+  final String journeyId;
+
+  @override
+  Override overrideWith(
+    Stream<List<RoutePoiEntity>> Function(RoutePoisRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: RoutePoisProvider._internal(
+        (ref) => create(ref as RoutePoisRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        journeyId: journeyId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeStreamProviderElement<List<RoutePoiEntity>> createElement() {
+    return _RoutePoisProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is RoutePoisProvider && other.journeyId == journeyId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, journeyId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+mixin RoutePoisRef on AutoDisposeStreamProviderRef<List<RoutePoiEntity>> {
+  /// The parameter `journeyId` of this provider.
+  String get journeyId;
+}
+
+class _RoutePoisProviderElement
+    extends AutoDisposeStreamProviderElement<List<RoutePoiEntity>>
+    with RoutePoisRef {
+  _RoutePoisProviderElement(super.provider);
+
+  @override
+  String get journeyId => (origin as RoutePoisProvider).journeyId;
+}
+
+String _$chatbotReadyHash() => r'291671df083f5cabfae54c1203608006f7073244';
+
 /// See also [chatbotReady].
 @ProviderFor(chatbotReady)
 const chatbotReadyProvider = ChatbotReadyFamily();
 
 /// See also [chatbotReady].
-class ChatbotReadyFamily extends Family<AsyncValue<bool>> {
+class ChatbotReadyFamily extends Family<bool> {
   /// See also [chatbotReady].
   const ChatbotReadyFamily();
 
@@ -134,7 +266,7 @@ class ChatbotReadyFamily extends Family<AsyncValue<bool>> {
 }
 
 /// See also [chatbotReady].
-class ChatbotReadyProvider extends AutoDisposeStreamProvider<bool> {
+class ChatbotReadyProvider extends AutoDisposeProvider<bool> {
   /// See also [chatbotReady].
   ChatbotReadyProvider(
     String journeyId,
@@ -169,7 +301,7 @@ class ChatbotReadyProvider extends AutoDisposeStreamProvider<bool> {
 
   @override
   Override overrideWith(
-    Stream<bool> Function(ChatbotReadyRef provider) create,
+    bool Function(ChatbotReadyRef provider) create,
   ) {
     return ProviderOverride(
       origin: this,
@@ -186,7 +318,7 @@ class ChatbotReadyProvider extends AutoDisposeStreamProvider<bool> {
   }
 
   @override
-  AutoDisposeStreamProviderElement<bool> createElement() {
+  AutoDisposeProviderElement<bool> createElement() {
     return _ChatbotReadyProviderElement(this);
   }
 
@@ -204,27 +336,564 @@ class ChatbotReadyProvider extends AutoDisposeStreamProvider<bool> {
   }
 }
 
-mixin ChatbotReadyRef on AutoDisposeStreamProviderRef<bool> {
+mixin ChatbotReadyRef on AutoDisposeProviderRef<bool> {
   /// The parameter `journeyId` of this provider.
   String get journeyId;
 }
 
-class _ChatbotReadyProviderElement
-    extends AutoDisposeStreamProviderElement<bool> with ChatbotReadyRef {
+class _ChatbotReadyProviderElement extends AutoDisposeProviderElement<bool>
+    with ChatbotReadyRef {
   _ChatbotReadyProviderElement(super.provider);
 
   @override
   String get journeyId => (origin as ChatbotReadyProvider).journeyId;
 }
 
-String _$chatbotMessagesNotifierHash() =>
-    r'2016a46c6333b37453b31ba6d59956d186f90a10';
+String _$chatbotPoisLoadingHash() =>
+    r'63dac7423cc3ce32cf609acecaf17e45c56f5c21';
 
-abstract class _$ChatbotMessagesNotifier
-    extends BuildlessAutoDisposeAsyncNotifier<List<ChatMessage>> {
+/// See also [chatbotPoisLoading].
+@ProviderFor(chatbotPoisLoading)
+const chatbotPoisLoadingProvider = ChatbotPoisLoadingFamily();
+
+/// See also [chatbotPoisLoading].
+class ChatbotPoisLoadingFamily extends Family<bool> {
+  /// See also [chatbotPoisLoading].
+  const ChatbotPoisLoadingFamily();
+
+  /// See also [chatbotPoisLoading].
+  ChatbotPoisLoadingProvider call(
+    String journeyId,
+  ) {
+    return ChatbotPoisLoadingProvider(
+      journeyId,
+    );
+  }
+
+  @override
+  ChatbotPoisLoadingProvider getProviderOverride(
+    covariant ChatbotPoisLoadingProvider provider,
+  ) {
+    return call(
+      provider.journeyId,
+    );
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'chatbotPoisLoadingProvider';
+}
+
+/// See also [chatbotPoisLoading].
+class ChatbotPoisLoadingProvider extends AutoDisposeProvider<bool> {
+  /// See also [chatbotPoisLoading].
+  ChatbotPoisLoadingProvider(
+    String journeyId,
+  ) : this._internal(
+          (ref) => chatbotPoisLoading(
+            ref as ChatbotPoisLoadingRef,
+            journeyId,
+          ),
+          from: chatbotPoisLoadingProvider,
+          name: r'chatbotPoisLoadingProvider',
+          debugGetCreateSourceHash:
+              const bool.fromEnvironment('dart.vm.product')
+                  ? null
+                  : _$chatbotPoisLoadingHash,
+          dependencies: ChatbotPoisLoadingFamily._dependencies,
+          allTransitiveDependencies:
+              ChatbotPoisLoadingFamily._allTransitiveDependencies,
+          journeyId: journeyId,
+        );
+
+  ChatbotPoisLoadingProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.journeyId,
+  }) : super.internal();
+
+  final String journeyId;
+
+  @override
+  Override overrideWith(
+    bool Function(ChatbotPoisLoadingRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: ChatbotPoisLoadingProvider._internal(
+        (ref) => create(ref as ChatbotPoisLoadingRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        journeyId: journeyId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeProviderElement<bool> createElement() {
+    return _ChatbotPoisLoadingProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ChatbotPoisLoadingProvider && other.journeyId == journeyId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, journeyId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+mixin ChatbotPoisLoadingRef on AutoDisposeProviderRef<bool> {
+  /// The parameter `journeyId` of this provider.
+  String get journeyId;
+}
+
+class _ChatbotPoisLoadingProviderElement
+    extends AutoDisposeProviderElement<bool> with ChatbotPoisLoadingRef {
+  _ChatbotPoisLoadingProviderElement(super.provider);
+
+  @override
+  String get journeyId => (origin as ChatbotPoisLoadingProvider).journeyId;
+}
+
+String _$chatbotIndexingFailedHash() =>
+    r'ed99a318c7468fb07d7694160160bbba1ac57166';
+
+/// See also [chatbotIndexingFailed].
+@ProviderFor(chatbotIndexingFailed)
+const chatbotIndexingFailedProvider = ChatbotIndexingFailedFamily();
+
+/// See also [chatbotIndexingFailed].
+class ChatbotIndexingFailedFamily extends Family<bool> {
+  /// See also [chatbotIndexingFailed].
+  const ChatbotIndexingFailedFamily();
+
+  /// See also [chatbotIndexingFailed].
+  ChatbotIndexingFailedProvider call(
+    String journeyId,
+  ) {
+    return ChatbotIndexingFailedProvider(
+      journeyId,
+    );
+  }
+
+  @override
+  ChatbotIndexingFailedProvider getProviderOverride(
+    covariant ChatbotIndexingFailedProvider provider,
+  ) {
+    return call(
+      provider.journeyId,
+    );
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'chatbotIndexingFailedProvider';
+}
+
+/// See also [chatbotIndexingFailed].
+class ChatbotIndexingFailedProvider extends AutoDisposeProvider<bool> {
+  /// See also [chatbotIndexingFailed].
+  ChatbotIndexingFailedProvider(
+    String journeyId,
+  ) : this._internal(
+          (ref) => chatbotIndexingFailed(
+            ref as ChatbotIndexingFailedRef,
+            journeyId,
+          ),
+          from: chatbotIndexingFailedProvider,
+          name: r'chatbotIndexingFailedProvider',
+          debugGetCreateSourceHash:
+              const bool.fromEnvironment('dart.vm.product')
+                  ? null
+                  : _$chatbotIndexingFailedHash,
+          dependencies: ChatbotIndexingFailedFamily._dependencies,
+          allTransitiveDependencies:
+              ChatbotIndexingFailedFamily._allTransitiveDependencies,
+          journeyId: journeyId,
+        );
+
+  ChatbotIndexingFailedProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.journeyId,
+  }) : super.internal();
+
+  final String journeyId;
+
+  @override
+  Override overrideWith(
+    bool Function(ChatbotIndexingFailedRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: ChatbotIndexingFailedProvider._internal(
+        (ref) => create(ref as ChatbotIndexingFailedRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        journeyId: journeyId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeProviderElement<bool> createElement() {
+    return _ChatbotIndexingFailedProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ChatbotIndexingFailedProvider &&
+        other.journeyId == journeyId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, journeyId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+mixin ChatbotIndexingFailedRef on AutoDisposeProviderRef<bool> {
+  /// The parameter `journeyId` of this provider.
+  String get journeyId;
+}
+
+class _ChatbotIndexingFailedProviderElement
+    extends AutoDisposeProviderElement<bool> with ChatbotIndexingFailedRef {
+  _ChatbotIndexingFailedProviderElement(super.provider);
+
+  @override
+  String get journeyId => (origin as ChatbotIndexingFailedProvider).journeyId;
+}
+
+String _$retryRoutePoiIndexingHash() =>
+    r'c3027753c1c9c31e53d254b93e5de0a3a1ac5f75';
+
+/// See also [retryRoutePoiIndexing].
+@ProviderFor(retryRoutePoiIndexing)
+const retryRoutePoiIndexingProvider = RetryRoutePoiIndexingFamily();
+
+/// See also [retryRoutePoiIndexing].
+class RetryRoutePoiIndexingFamily extends Family<AsyncValue<void>> {
+  /// See also [retryRoutePoiIndexing].
+  const RetryRoutePoiIndexingFamily();
+
+  /// See also [retryRoutePoiIndexing].
+  RetryRoutePoiIndexingProvider call(
+    String journeyId,
+  ) {
+    return RetryRoutePoiIndexingProvider(
+      journeyId,
+    );
+  }
+
+  @override
+  RetryRoutePoiIndexingProvider getProviderOverride(
+    covariant RetryRoutePoiIndexingProvider provider,
+  ) {
+    return call(
+      provider.journeyId,
+    );
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'retryRoutePoiIndexingProvider';
+}
+
+/// See also [retryRoutePoiIndexing].
+class RetryRoutePoiIndexingProvider extends AutoDisposeFutureProvider<void> {
+  /// See also [retryRoutePoiIndexing].
+  RetryRoutePoiIndexingProvider(
+    String journeyId,
+  ) : this._internal(
+          (ref) => retryRoutePoiIndexing(
+            ref as RetryRoutePoiIndexingRef,
+            journeyId,
+          ),
+          from: retryRoutePoiIndexingProvider,
+          name: r'retryRoutePoiIndexingProvider',
+          debugGetCreateSourceHash:
+              const bool.fromEnvironment('dart.vm.product')
+                  ? null
+                  : _$retryRoutePoiIndexingHash,
+          dependencies: RetryRoutePoiIndexingFamily._dependencies,
+          allTransitiveDependencies:
+              RetryRoutePoiIndexingFamily._allTransitiveDependencies,
+          journeyId: journeyId,
+        );
+
+  RetryRoutePoiIndexingProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.journeyId,
+  }) : super.internal();
+
+  final String journeyId;
+
+  @override
+  Override overrideWith(
+    FutureOr<void> Function(RetryRoutePoiIndexingRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: RetryRoutePoiIndexingProvider._internal(
+        (ref) => create(ref as RetryRoutePoiIndexingRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        journeyId: journeyId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeFutureProviderElement<void> createElement() {
+    return _RetryRoutePoiIndexingProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is RetryRoutePoiIndexingProvider &&
+        other.journeyId == journeyId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, journeyId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+mixin RetryRoutePoiIndexingRef on AutoDisposeFutureProviderRef<void> {
+  /// The parameter `journeyId` of this provider.
+  String get journeyId;
+}
+
+class _RetryRoutePoiIndexingProviderElement
+    extends AutoDisposeFutureProviderElement<void>
+    with RetryRoutePoiIndexingRef {
+  _RetryRoutePoiIndexingProviderElement(super.provider);
+
+  @override
+  String get journeyId => (origin as RetryRoutePoiIndexingProvider).journeyId;
+}
+
+String _$routePoiIndexingStatusHash() =>
+    r'0f1377abc9005e36cfa31332c51953907a414344';
+
+abstract class _$RoutePoiIndexingStatus
+    extends BuildlessAutoDisposeNotifier<RoutePoiIndexingState> {
   late final String journeyId;
 
-  FutureOr<List<ChatMessage>> build(
+  RoutePoiIndexingState build(
+    String journeyId,
+  );
+}
+
+/// See also [RoutePoiIndexingStatus].
+@ProviderFor(RoutePoiIndexingStatus)
+const routePoiIndexingStatusProvider = RoutePoiIndexingStatusFamily();
+
+/// See also [RoutePoiIndexingStatus].
+class RoutePoiIndexingStatusFamily extends Family<RoutePoiIndexingState> {
+  /// See also [RoutePoiIndexingStatus].
+  const RoutePoiIndexingStatusFamily();
+
+  /// See also [RoutePoiIndexingStatus].
+  RoutePoiIndexingStatusProvider call(
+    String journeyId,
+  ) {
+    return RoutePoiIndexingStatusProvider(
+      journeyId,
+    );
+  }
+
+  @override
+  RoutePoiIndexingStatusProvider getProviderOverride(
+    covariant RoutePoiIndexingStatusProvider provider,
+  ) {
+    return call(
+      provider.journeyId,
+    );
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'routePoiIndexingStatusProvider';
+}
+
+/// See also [RoutePoiIndexingStatus].
+class RoutePoiIndexingStatusProvider extends AutoDisposeNotifierProviderImpl<
+    RoutePoiIndexingStatus, RoutePoiIndexingState> {
+  /// See also [RoutePoiIndexingStatus].
+  RoutePoiIndexingStatusProvider(
+    String journeyId,
+  ) : this._internal(
+          () => RoutePoiIndexingStatus()..journeyId = journeyId,
+          from: routePoiIndexingStatusProvider,
+          name: r'routePoiIndexingStatusProvider',
+          debugGetCreateSourceHash:
+              const bool.fromEnvironment('dart.vm.product')
+                  ? null
+                  : _$routePoiIndexingStatusHash,
+          dependencies: RoutePoiIndexingStatusFamily._dependencies,
+          allTransitiveDependencies:
+              RoutePoiIndexingStatusFamily._allTransitiveDependencies,
+          journeyId: journeyId,
+        );
+
+  RoutePoiIndexingStatusProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.journeyId,
+  }) : super.internal();
+
+  final String journeyId;
+
+  @override
+  RoutePoiIndexingState runNotifierBuild(
+    covariant RoutePoiIndexingStatus notifier,
+  ) {
+    return notifier.build(
+      journeyId,
+    );
+  }
+
+  @override
+  Override overrideWith(RoutePoiIndexingStatus Function() create) {
+    return ProviderOverride(
+      origin: this,
+      override: RoutePoiIndexingStatusProvider._internal(
+        () => create()..journeyId = journeyId,
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        journeyId: journeyId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeNotifierProviderElement<RoutePoiIndexingStatus,
+      RoutePoiIndexingState> createElement() {
+    return _RoutePoiIndexingStatusProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is RoutePoiIndexingStatusProvider &&
+        other.journeyId == journeyId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, journeyId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+mixin RoutePoiIndexingStatusRef
+    on AutoDisposeNotifierProviderRef<RoutePoiIndexingState> {
+  /// The parameter `journeyId` of this provider.
+  String get journeyId;
+}
+
+class _RoutePoiIndexingStatusProviderElement
+    extends AutoDisposeNotifierProviderElement<RoutePoiIndexingStatus,
+        RoutePoiIndexingState> with RoutePoiIndexingStatusRef {
+  _RoutePoiIndexingStatusProviderElement(super.provider);
+
+  @override
+  String get journeyId => (origin as RoutePoiIndexingStatusProvider).journeyId;
+}
+
+String _$chatbotMessagesNotifierHash() =>
+    r'9cd37c9001b5c0e17ef384f8bd7568af4fffa189';
+
+abstract class _$ChatbotMessagesNotifier
+    extends BuildlessAutoDisposeStreamNotifier<List<ChatMessageEntity>> {
+  late final String journeyId;
+
+  Stream<List<ChatMessageEntity>> build(
     String journeyId,
   );
 }
@@ -235,7 +904,7 @@ const chatbotMessagesNotifierProvider = ChatbotMessagesNotifierFamily();
 
 /// See also [ChatbotMessagesNotifier].
 class ChatbotMessagesNotifierFamily
-    extends Family<AsyncValue<List<ChatMessage>>> {
+    extends Family<AsyncValue<List<ChatMessageEntity>>> {
   /// See also [ChatbotMessagesNotifier].
   const ChatbotMessagesNotifierFamily();
 
@@ -274,8 +943,8 @@ class ChatbotMessagesNotifierFamily
 
 /// See also [ChatbotMessagesNotifier].
 class ChatbotMessagesNotifierProvider
-    extends AutoDisposeAsyncNotifierProviderImpl<ChatbotMessagesNotifier,
-        List<ChatMessage>> {
+    extends AutoDisposeStreamNotifierProviderImpl<ChatbotMessagesNotifier,
+        List<ChatMessageEntity>> {
   /// See also [ChatbotMessagesNotifier].
   ChatbotMessagesNotifierProvider(
     String journeyId,
@@ -306,7 +975,7 @@ class ChatbotMessagesNotifierProvider
   final String journeyId;
 
   @override
-  FutureOr<List<ChatMessage>> runNotifierBuild(
+  Stream<List<ChatMessageEntity>> runNotifierBuild(
     covariant ChatbotMessagesNotifier notifier,
   ) {
     return notifier.build(
@@ -331,8 +1000,8 @@ class ChatbotMessagesNotifierProvider
   }
 
   @override
-  AutoDisposeAsyncNotifierProviderElement<ChatbotMessagesNotifier,
-      List<ChatMessage>> createElement() {
+  AutoDisposeStreamNotifierProviderElement<ChatbotMessagesNotifier,
+      List<ChatMessageEntity>> createElement() {
     return _ChatbotMessagesNotifierProviderElement(this);
   }
 
@@ -352,14 +1021,14 @@ class ChatbotMessagesNotifierProvider
 }
 
 mixin ChatbotMessagesNotifierRef
-    on AutoDisposeAsyncNotifierProviderRef<List<ChatMessage>> {
+    on AutoDisposeStreamNotifierProviderRef<List<ChatMessageEntity>> {
   /// The parameter `journeyId` of this provider.
   String get journeyId;
 }
 
 class _ChatbotMessagesNotifierProviderElement
-    extends AutoDisposeAsyncNotifierProviderElement<ChatbotMessagesNotifier,
-        List<ChatMessage>> with ChatbotMessagesNotifierRef {
+    extends AutoDisposeStreamNotifierProviderElement<ChatbotMessagesNotifier,
+        List<ChatMessageEntity>> with ChatbotMessagesNotifierRef {
   _ChatbotMessagesNotifierProviderElement(super.provider);
 
   @override

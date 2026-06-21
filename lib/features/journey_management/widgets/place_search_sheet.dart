@@ -4,13 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../core/constants/app_colors.dart';
 import '../providers/place_search_provider.dart';
+import '../services/current_location_service.dart';
 
 class PlaceSearchSheet extends ConsumerStatefulWidget {
   final String title;
+  final bool showCurrentLocationOption;
 
   const PlaceSearchSheet({
     super.key,
     required this.title,
+    this.showCurrentLocationOption = true,
   });
 
   @override
@@ -21,6 +24,8 @@ class _PlaceSearchSheetState extends ConsumerState<PlaceSearchSheet> {
   final _controller = TextEditingController();
   Timer? _debounce;
   bool _isFetchingDetails = false;
+  bool _isFetchingCurrentLocation = false;
+  final _currentLocationService = CurrentLocationService();
 
   @override
   void dispose() {
@@ -34,6 +39,29 @@ class _PlaceSearchSheetState extends ConsumerState<PlaceSearchSheet> {
     _debounce = Timer(const Duration(milliseconds: 400), () {
       ref.read(placeSearchProvider.notifier).search(query);
     });
+  }
+
+  Future<void> _useCurrentLocation() async {
+    setState(() => _isFetchingCurrentLocation = true);
+    try {
+      final place = await _currentLocationService.getCurrentPlace();
+      if (mounted) {
+        Navigator.of(context).pop(place);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not get current location: $e'),
+            backgroundColor: Colors.red[800],
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingCurrentLocation = false);
+      }
+    }
   }
 
   @override
@@ -73,12 +101,50 @@ class _PlaceSearchSheetState extends ConsumerState<PlaceSearchSheet> {
                   color: Colors.white,
                 ),
           ),
+          if (widget.showCurrentLocationOption) ...[
+            SizedBox(height: 16.h),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Container(
+                padding: EdgeInsets.all(8.r),
+                decoration: BoxDecoration(
+                  color: AppColors.convoyGreen.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10.r),
+                ),
+                child: _isFetchingCurrentLocation
+                    ? SizedBox(
+                        width: 20.w,
+                        height: 20.w,
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.convoyGreen,
+                        ),
+                      )
+                    : Icon(Icons.my_location,
+                        color: AppColors.convoyGreen, size: 20.w),
+              ),
+              title: Text(
+                'Use current location',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: Text(
+                'Set this field to where you are right now',
+                style: TextStyle(color: Colors.grey[500], fontSize: 12.sp),
+              ),
+              onTap: _isFetchingCurrentLocation ? null : _useCurrentLocation,
+            ),
+            Divider(color: AppColors.border.withOpacity(0.5), height: 1.h),
+          ],
           SizedBox(height: 16.h),
           TextField(
             controller: _controller,
             onChanged: _onSearchChanged,
             style: TextStyle(color: Colors.white, fontSize: 16.sp),
-            autofocus: true,
+            autofocus: !widget.showCurrentLocationOption,
             decoration: InputDecoration(
               hintText: 'Search for place...',
               hintStyle: TextStyle(color: Colors.grey[500], fontSize: 16.sp),

@@ -7,7 +7,7 @@ part of 'journey_details_provider.dart';
 // **************************************************************************
 
 String _$watchJourneyDetailsHash() =>
-    r'34c9492e07e8b079e7548e988d3d8b760d45275a';
+    r'efe0c73a4c2c94134de3497db026b1d65fd42951';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -156,6 +156,139 @@ class _WatchJourneyDetailsProviderElement
 
   @override
   String get id => (origin as WatchJourneyDetailsProvider).id;
+}
+
+String _$watchCheckpointsHash() => r'bf83edb41f914cdf6dbaaf0a777a0d9fa27a5069';
+
+/// See also [watchCheckpoints].
+@ProviderFor(watchCheckpoints)
+const watchCheckpointsProvider = WatchCheckpointsFamily();
+
+/// See also [watchCheckpoints].
+class WatchCheckpointsFamily
+    extends Family<AsyncValue<List<CheckpointEntity>>> {
+  /// See also [watchCheckpoints].
+  const WatchCheckpointsFamily();
+
+  /// See also [watchCheckpoints].
+  WatchCheckpointsProvider call(
+    String journeyId,
+  ) {
+    return WatchCheckpointsProvider(
+      journeyId,
+    );
+  }
+
+  @override
+  WatchCheckpointsProvider getProviderOverride(
+    covariant WatchCheckpointsProvider provider,
+  ) {
+    return call(
+      provider.journeyId,
+    );
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'watchCheckpointsProvider';
+}
+
+/// See also [watchCheckpoints].
+class WatchCheckpointsProvider
+    extends AutoDisposeStreamProvider<List<CheckpointEntity>> {
+  /// See also [watchCheckpoints].
+  WatchCheckpointsProvider(
+    String journeyId,
+  ) : this._internal(
+          (ref) => watchCheckpoints(
+            ref as WatchCheckpointsRef,
+            journeyId,
+          ),
+          from: watchCheckpointsProvider,
+          name: r'watchCheckpointsProvider',
+          debugGetCreateSourceHash:
+              const bool.fromEnvironment('dart.vm.product')
+                  ? null
+                  : _$watchCheckpointsHash,
+          dependencies: WatchCheckpointsFamily._dependencies,
+          allTransitiveDependencies:
+              WatchCheckpointsFamily._allTransitiveDependencies,
+          journeyId: journeyId,
+        );
+
+  WatchCheckpointsProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.journeyId,
+  }) : super.internal();
+
+  final String journeyId;
+
+  @override
+  Override overrideWith(
+    Stream<List<CheckpointEntity>> Function(WatchCheckpointsRef provider)
+        create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: WatchCheckpointsProvider._internal(
+        (ref) => create(ref as WatchCheckpointsRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        journeyId: journeyId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeStreamProviderElement<List<CheckpointEntity>> createElement() {
+    return _WatchCheckpointsProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is WatchCheckpointsProvider && other.journeyId == journeyId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, journeyId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+mixin WatchCheckpointsRef
+    on AutoDisposeStreamProviderRef<List<CheckpointEntity>> {
+  /// The parameter `journeyId` of this provider.
+  String get journeyId;
+}
+
+class _WatchCheckpointsProviderElement
+    extends AutoDisposeStreamProviderElement<List<CheckpointEntity>>
+    with WatchCheckpointsRef {
+  _WatchCheckpointsProviderElement(super.provider);
+
+  @override
+  String get journeyId => (origin as WatchCheckpointsProvider).journeyId;
 }
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

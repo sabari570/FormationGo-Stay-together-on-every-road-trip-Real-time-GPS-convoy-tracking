@@ -36,22 +36,17 @@ dependencies:
   flutter_riverpod: 
   riverpod_annotation: 
 
-  # Database
-  drift: 
-  sqlite3: 
-  sqlite3_flutter_libs: 
-  path_provider: 
-  path: 
-
-  # Maps & Location
-  google_maps_flutter: 
-  geolocator: 
+  # Maps & Location (free: OpenStreetMap tiles + OSRM routing)
+  flutter_map:
+  latlong2:
+  geolocator:
 
   # Networking & Real-time
   dio: 
 
   # Firebase
-  firebase_core: 
+  firebase_core:
+  firebase_auth:
 
   # Utilities
   uuid: 
@@ -73,9 +68,11 @@ dependencies:
   share_plus: ^10.0.0
   http: ^1.2.2
 
-  # AI Chatbot & Polyline decoding
+  # AI Chatbot
   google_generative_ai: ^0.4.6
-  flutter_polyline_points: ^2.0.0
+  flutter_dotenv: ^5.2.1
+  encrypt: ^5.0.3
+  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:
@@ -85,7 +82,6 @@ dev_dependencies:
   # Code Generation
   build_runner: 
   riverpod_generator: 
-  drift_dev: 
   freezed: 
   json_serializable: 
 
@@ -95,3 +91,4 @@ flutter:
     - assets/images/
     - assets/lottie/
     - assets/fonts/
+    - .env

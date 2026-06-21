@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "291642320864",
+    "project_id": "formation-go",
+    "storage_bucket": "formation-go.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:291642320864:android:082e5be4561a1ea80c2d85",
+        "android_client_info": {
+          "package_name": "com.example.formation_go"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9k80emKBIwtziFtqjjod42Q-qQPK-kmM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

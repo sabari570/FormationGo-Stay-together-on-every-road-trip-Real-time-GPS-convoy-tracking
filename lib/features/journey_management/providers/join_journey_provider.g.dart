@@ -6,7 +6,7 @@ part of 'join_journey_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$joinJourneyHash() => r'c436ba920d84fb1e90cef3c751b7074262a551f0';
+String _$joinJourneyHash() => r'56bea388431e67ff71aca8fc0eb61d1a09536ff5';
 
 /// See also [JoinJourney].
 @ProviderFor(JoinJourney)

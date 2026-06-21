@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:geolocator/geolocator.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/providers/repository_providers.dart';
+import '../../chatbot/providers/chatbot_provider.dart';
 import 'place_search_sheet.dart';
 import '../providers/place_search_provider.dart';
+import '../services/current_location_service.dart';
 
 class JourneySetupSheet extends ConsumerStatefulWidget {
   final String journeyId;
@@ -31,6 +32,9 @@ class _JourneySetupSheetState extends ConsumerState<JourneySetupSheet> {
   double? _destinationLng;
 
   bool _isLoading = false;
+  bool _isFetchingLocation = false;
+
+  final _currentLocationService = CurrentLocationService();
 
   @override
   void initState() {
@@ -40,21 +44,48 @@ class _JourneySetupSheetState extends ConsumerState<JourneySetupSheet> {
 
   Future<void> _fetchCurrentLocationBaseline() async {
     try {
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      final place = await _currentLocationService.getCurrentPlace();
       if (mounted) {
         setState(() {
-          _sourceLat = position.latitude;
-          _sourceLng = position.longitude;
+          _sourceName = place.name;
+          _sourceLat = place.latitude;
+          _sourceLng = place.longitude;
         });
       }
     } catch (e) {
-      // Permission or GPS error. Let user select manually.
       if (mounted) {
         setState(() {
           _sourceName = 'Choose starting point';
         });
+      }
+    }
+  }
+
+  Future<void> _setCurrentLocation({required bool isSource}) async {
+    setState(() => _isFetchingLocation = true);
+    try {
+      final place = await _currentLocationService.getCurrentPlace();
+      if (!mounted) return;
+      setState(() {
+        if (isSource) {
+          _sourceName = place.name;
+          _sourceLat = place.latitude;
+          _sourceLng = place.longitude;
+        } else {
+          _destinationName = place.name;
+          _destinationLat = place.latitude;
+          _destinationLng = place.longitude;
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not get current location: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingLocation = false);
       }
     }
   }
@@ -127,6 +158,11 @@ class _JourneySetupSheetState extends ConsumerState<JourneySetupSheet> {
           updatedAt: DateTime.now(),
         );
         await repo.saveJourney(updatedJourney);
+
+        ref
+            .read(routePoiIndexingStatusProvider(widget.journeyId).notifier)
+            .startIndexing();
+
         widget.onJourneyStarted();
       }
     } catch (e) {
@@ -195,7 +231,7 @@ class _JourneySetupSheetState extends ConsumerState<JourneySetupSheet> {
             textAlign: TextAlign.center,
           ),
           SizedBox(height: 24.h),
-          
+
           // Source Input Card
           _buildLocationPickerCard(
             context,
@@ -204,24 +240,28 @@ class _JourneySetupSheetState extends ConsumerState<JourneySetupSheet> {
             icon: Icons.my_location,
             iconColor: AppColors.convoyGreen,
             onTap: _pickSource,
+            onUseCurrentLocation: () => _setCurrentLocation(isSource: true),
           ),
           SizedBox(height: 16.h),
-          
+
           // Destination Input Card
           _buildLocationPickerCard(
             context,
             label: 'DESTINATION',
             value: _destinationName ?? 'Where are we going?',
-            valueColor: _destinationName == null ? Colors.grey[500] : Colors.white,
+            valueColor:
+                _destinationName == null ? Colors.grey[500] : Colors.white,
             icon: Icons.place,
             iconColor: AppColors.convoyRed,
             onTap: _pickDestination,
+            onUseCurrentLocation: () => _setCurrentLocation(isSource: false),
           ),
           SizedBox(height: 28.h),
-          
+
           // Start Button
           ElevatedButton(
-            onPressed: _isLoading ? null : _startJourney,
+            onPressed:
+                (_isLoading || _isFetchingLocation) ? null : _startJourney,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.convoyBlue,
               foregroundColor: Colors.white,
@@ -262,21 +302,23 @@ class _JourneySetupSheetState extends ConsumerState<JourneySetupSheet> {
     required IconData icon,
     required Color iconColor,
     required VoidCallback onTap,
+    VoidCallback? onUseCurrentLocation,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
-        decoration: BoxDecoration(
-          color: AppColors.bg1,
-          borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(color: AppColors.border, width: 1.w),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: iconColor, size: 24.w),
-            SizedBox(width: 14.w),
-            Expanded(
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+      decoration: BoxDecoration(
+        color: AppColors.bg1,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: AppColors.border, width: 1.w),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 24.w),
+          SizedBox(width: 14.w),
+          Expanded(
+            child: GestureDetector(
+              onTap: onTap,
+              behavior: HitTestBehavior.opaque,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -303,9 +345,23 @@ class _JourneySetupSheetState extends ConsumerState<JourneySetupSheet> {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.grey[500], size: 20.w),
-          ],
-        ),
+          ),
+          if (onUseCurrentLocation != null)
+            IconButton(
+              tooltip: 'Use current location',
+              onPressed: _isFetchingLocation ? null : onUseCurrentLocation,
+              icon: Icon(
+                Icons.gps_fixed,
+                color: iconColor,
+                size: 20.w,
+              ),
+            ),
+          GestureDetector(
+            onTap: onTap,
+            child:
+                Icon(Icons.chevron_right, color: Colors.grey[500], size: 20.w),
+          ),
+        ],
       ),
     );
   }

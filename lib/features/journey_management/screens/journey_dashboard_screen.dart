@@ -1,16 +1,20 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/relative_time.dart';
 import '../../../core/providers/device_identity_provider.dart';
 import '../../../core/providers/repository_providers.dart';
 import '../../../domain/entities/journey.dart';
 import '../../../domain/entities/checkpoint.dart';
+import '../../../domain/entities/journey_member.dart';
+import '../../../domain/entities/member_location.dart';
 import '../../tracking/providers/location_provider.dart';
+import '../../tracking/providers/live_location_provider.dart';
 import '../../tracking/services/directions_service.dart';
 import '../../home/providers/home_provider.dart';
 import '../providers/journey_details_provider.dart';
@@ -18,32 +22,11 @@ import '../providers/place_search_provider.dart';
 import '../widgets/journey_setup_sheet.dart';
 import '../widgets/invite_sheet.dart';
 import '../widgets/place_search_sheet.dart';
+import '../services/current_location_service.dart';
 import 'package:geolocator/geolocator.dart';
+import '../../tracking/widgets/convoy_map.dart';
 import '../../chatbot/widgets/chatbot_fab.dart';
 import '../../chatbot/providers/chatbot_provider.dart';
-
-// ---------------------------------------------------------------------------
-// DummyMember — simulates a convoy member for development/demo purposes.
-// ---------------------------------------------------------------------------
-class DummyMember {
-  final String id;
-  final String name;
-  final String avatarInitial;
-  final Color avatarColor;
-  final double markerHue;
-  int currentRouteIndex;
-  LatLng currentPosition;
-
-  DummyMember({
-    required this.id,
-    required this.name,
-    required this.avatarInitial,
-    required this.avatarColor,
-    required this.markerHue,
-    required this.currentRouteIndex,
-    required this.currentPosition,
-  });
-}
 
 class JourneyDashboardScreen extends ConsumerStatefulWidget {
   final String journeyId;
@@ -57,20 +40,10 @@ class JourneyDashboardScreen extends ConsumerStatefulWidget {
 
 class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
     with WidgetsBindingObserver {
-  // ----------------------------------------------------------------
-  // DEV FLAG: set to false to disable dummy simulation in production.
-  // ----------------------------------------------------------------
-  static const bool _useDummyRealtimeData = true;
-
-  GoogleMapController? _mapController;
+  MapController? _mapController;
   List<LatLng> _routePoints = [];
   bool _fetchingRoute = false;
   LatLng? _currentLatLng;
-
-  // Dummy member simulation state
-  final List<DummyMember> _dummyMembers = [];
-  Timer? _dummyMovementTimer;
-  bool _dummyInitialized = false;
 
   @override
   void initState() {
@@ -81,8 +54,6 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _dummyMovementTimer?.cancel();
-    _mapController?.dispose();
     super.dispose();
   }
 
@@ -94,104 +65,8 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Dummy member helpers (only active when _useDummyRealtimeData == true)
-  // ---------------------------------------------------------------------------
-
-  /// Seeds dummy members at staggered positions along the fetched route.
-  void _initializeDummyMembers() {
-    if (!_useDummyRealtimeData || _dummyInitialized || _routePoints.length < 6)
-      return;
-    _dummyInitialized = true;
-
-    final routeLen = _routePoints.length;
-    // Stagger: member 1 starts at ~15% of route, member 2 at ~8%, member 3 at ~2%
-    final offsets = [
-      max(0, (routeLen * 0.15).round()),
-      max(0, (routeLen * 0.08).round()),
-      max(0, (routeLen * 0.02).round())
-    ];
-
-    final specs = [
-      {
-        'id': 'dummy_alex',
-        'name': 'Alex Mercer',
-        'initial': 'A',
-        'color': AppColors.convoyBlue,
-        'hue': BitmapDescriptor.hueAzure,
-      },
-      {
-        'id': 'dummy_sarah',
-        'name': 'Sarah Connor',
-        'initial': 'S',
-        'color': AppColors.convoyAmber,
-        'hue': BitmapDescriptor.hueOrange,
-      },
-      {
-        'id': 'dummy_raj',
-        'name': 'Raj Patel',
-        'initial': 'R',
-        'color': Colors.deepPurple,
-        'hue': BitmapDescriptor.hueViolet,
-      },
-    ];
-
-    for (var i = 0; i < specs.length; i++) {
-      final startIdx = offsets[i];
-      _dummyMembers.add(DummyMember(
-        id: specs[i]['id'] as String,
-        name: specs[i]['name'] as String,
-        avatarInitial: specs[i]['initial'] as String,
-        avatarColor: specs[i]['color'] as Color,
-        markerHue: specs[i]['hue'] as double,
-        currentRouteIndex: startIdx,
-        currentPosition: _routePoints[startIdx],
-      ));
-    }
-
-    _startDummyMovement();
-  }
-
-  /// Advances all dummy members along the route every 2 seconds.
-  void _startDummyMovement() {
-    _dummyMovementTimer?.cancel();
-    _dummyMovementTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (!mounted) return;
-      setState(() {
-        for (final member in _dummyMembers) {
-          // Advance 1-2 route points per tick to simulate varying speed
-          final step = 1 + Random().nextInt(2);
-          final nextIdx =
-              min(member.currentRouteIndex + step, _routePoints.length - 1);
-          member.currentRouteIndex = nextIdx;
-          member.currentPosition = _routePoints[nextIdx];
-        }
-      });
-    });
-  }
-
-  /// Returns approximate km remaining for a dummy member based on route index.
-  String _memberDistanceLabel(DummyMember member) {
-    final hostIdx = _routePoints.length - 1; // host is at end (destination)
-    final diff = hostIdx - member.currentRouteIndex;
-    if (diff <= 0) return 'Arrived at Destination';
-    // Each route point is roughly 20-50m; estimate ~30m per point
-    final estimatedMeters = diff * 30;
-    if (estimatedMeters >= 1000) {
-      return '${(estimatedMeters / 1000).toStringAsFixed(1)} km behind';
-    }
-    return '${estimatedMeters}m behind';
-  }
-
-  Color _memberStatusColor(DummyMember member) {
-    final diff = (_routePoints.length - 1) - member.currentRouteIndex;
-    if (diff <= 0) return Colors.greenAccent;
-    if (diff * 30 > 3000) return AppColors.convoyAmber;
-    return Colors.greenAccent;
-  }
-
-  void _fetchRoute(
-      double startLat, double startLng, double destLat, double destLng, JourneyEntity journey) async {
+  void _fetchRoute(double startLat, double startLng, double destLat,
+      double destLng, JourneyEntity journey) async {
     if (_fetchingRoute || _routePoints.isNotEmpty) return;
 
     setState(() {
@@ -209,15 +84,19 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
         setState(() {
           _routePoints = points;
         });
-        _fitRouteBounds();
-        // Seed dummy members once route is available
-        _initializeDummyMembers();
+        if (points.isNotEmpty) {
+          _fitRouteBounds();
+        }
 
-        // Trigger background pipeline to fetch and cache POIs for chatbot
-        ref.read(routePipelineServiceProvider).initializeForJourney(journey);
+        ref.read(routePipelineServiceProvider).initializeForJourney(
+              journey,
+              routeCoordinates: points,
+            );
       }
     } catch (e) {
-      // Quietly fail or show a light warning
+      if (mounted) {
+        ref.read(routePipelineServiceProvider).initializeForJourney(journey);
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -229,33 +108,12 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
 
   void _fitRouteBounds() {
     if (_mapController == null || _routePoints.isEmpty) return;
-
-    double? minLat, maxLat, minLng, maxLng;
-    for (final point in _routePoints) {
-      if (minLat == null || point.latitude < minLat) minLat = point.latitude;
-      if (maxLat == null || point.latitude > maxLat) maxLat = point.latitude;
-      if (minLng == null || point.longitude < minLng) minLng = point.longitude;
-      if (maxLng == null || point.longitude > maxLng) maxLng = point.longitude;
-    }
-
-    if (minLat != null && maxLat != null && minLng != null && maxLng != null) {
-      final bounds = LatLngBounds(
-        southwest: LatLng(minLat, minLng),
-        northeast: LatLng(maxLat, maxLng),
-      );
-      _mapController!.animateCamera(
-        CameraUpdate.newLatLngBounds(bounds, 80.r),
-      );
-    }
+    fitMapToRoute(_mapController!, _routePoints, padding: 80.r);
   }
 
   void _recenter() {
     if (_mapController != null && _currentLatLng != null) {
-      _mapController!.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(target: _currentLatLng!, zoom: 15),
-        ),
-      );
+      _mapController!.move(_currentLatLng!, 15);
     }
   }
 
@@ -756,7 +614,8 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
                                           onPressed: () async {
                                             await ref
                                                 .read(journeyRepositoryProvider)
-                                                .deleteCheckpoint(cp.id);
+                                                .deleteCheckpoint(
+                                                    journey.id, cp.id);
                                           },
                                         )
                                       : null,
@@ -803,6 +662,21 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
               ),
               SizedBox(height: 16.h),
               ListTile(
+                leading: Icon(Icons.my_location,
+                    color: AppColors.convoyGreen, size: 22.w),
+                title: const Text('Use My Current Location',
+                    style: TextStyle(color: Colors.white)),
+                subtitle: Text(
+                  'Add a checkpoint at your live GPS position',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12.sp),
+                ),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await _addCheckpointAtCurrentLocation();
+                },
+              ),
+              Divider(color: AppColors.border, height: 1.h),
+              ListTile(
                 leading:
                     Icon(Icons.search, color: AppColors.convoyBlue, size: 22.w),
                 title: const Text('Search for Location',
@@ -827,7 +701,7 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
               Divider(color: AppColors.border, height: 1.h),
               ListTile(
                 leading: Icon(Icons.touch_app,
-                    color: AppColors.convoyGreen, size: 22.w),
+                    color: AppColors.convoyAmber, size: 22.w),
                 title: const Text('Long-press on Map',
                     style: TextStyle(color: Colors.white)),
                 onTap: () {
@@ -846,6 +720,31 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
         );
       },
     );
+  }
+
+  Future<void> _addCheckpointAtCurrentLocation() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final locationService = CurrentLocationService();
+      final PlaceDetails place;
+
+      if (_currentLatLng != null) {
+        place = await locationService.placeFromLatLng(_currentLatLng!);
+      } else {
+        place = await locationService.getCurrentPlace();
+      }
+
+      if (!mounted) return;
+
+      _showAddCheckpointDialog(
+        LatLng(place.latitude, place.longitude),
+        defaultName: place.name,
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not get current location: $e')),
+      );
+    }
   }
 
   Color _fromHex(String hexString) {
@@ -872,15 +771,9 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
     return Stack(
       children: [
         // Faded map as background so the screen doesn't look empty.
-        GoogleMap(
-          initialCameraPosition: CameraPosition(
-            target: LatLng(fallbackLat, fallbackLng),
-            zoom: 6,
-          ),
-          myLocationEnabled: false,
-          myLocationButtonEnabled: false,
-          compassEnabled: false,
-          zoomControlsEnabled: false,
+        ConvoyMap(
+          initialCenter: LatLng(fallbackLat, fallbackLng),
+          initialZoom: 6,
         ),
         // Dark scrim
         Container(color: Colors.black.withOpacity(0.65)),
@@ -1001,28 +894,45 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
     );
   }
 
-  void _showMembersSheet() {
+  String _locationStatusLabel(MemberLocationEntity? location) {
+    if (location == null) return 'Waiting for GPS...';
+    final age = DateTime.now().difference(location.timestamp);
+    if (age > const Duration(minutes: 2)) {
+      return 'Last seen ${formatTimeAgo(age)}';
+    }
+    if (location.speed > 1)
+      return 'Moving • ${(location.speed * 3.6).toStringAsFixed(0)} km/h';
+    return 'Active - Tracking GPS';
+  }
+
+  Color _locationStatusColor(MemberLocationEntity? location) {
+    if (location == null) return Colors.grey;
+    final age = DateTime.now().difference(location.timestamp);
+    if (age > const Duration(minutes: 2)) return AppColors.convoyAmber;
+    return Colors.greenAccent;
+  }
+
+  void _showMembersSheet(String journeyId, String currentDeviceId) {
     final profile = ref.read(currentProfileProvider).valueOrNull;
-    final name = profile?.name ?? 'Host';
+    final name = profile?.name ?? 'You';
     final avatarColor = profile?.avatarColor ?? '#4CAF50';
     final color = _fromHex(avatarColor);
-    final initial = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'H';
-
-    // Capture current dummy state snapshot for the sheet
-    final dummySnapshot = List<DummyMember>.from(_dummyMembers);
+    final initial = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'Y';
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) {
-          // Refresh sheet every 2s when in dev mode to update distances
-          if (_useDummyRealtimeData && dummySnapshot.isNotEmpty) {
-            Future.delayed(const Duration(seconds: 2), () {
-              if (context.mounted) setSheetState(() {});
-            });
-          }
+      builder: (sheetContext) => Consumer(
+        builder: (context, ref, _) {
+          final members =
+              ref.watch(journeyMembersProvider(journeyId)).valueOrNull ?? [];
+          final locations =
+              ref.watch(memberLocationsProvider(journeyId)).valueOrNull ?? [];
+          final locationByDevice = {
+            for (final loc in locations) loc.deviceId: loc,
+          };
+
           return Container(
             decoration: BoxDecoration(
               color: AppColors.bg0,
@@ -1049,113 +959,94 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
                   ),
                 ),
                 SizedBox(height: 18.h),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Convoy Members',
-                      style:
-                          Theme.of(context).textTheme.displayMedium?.copyWith(
-                                fontSize: 20.sp,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                    ),
-                    if (_useDummyRealtimeData) ...[
-                      SizedBox(width: 8.w),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 8.w, vertical: 2.h),
-                        decoration: BoxDecoration(
-                          color: AppColors.convoyAmber.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8.r),
-                          border: Border.all(
-                              color: AppColors.convoyAmber.withOpacity(0.4)),
+                Text(
+                  'Convoy Members',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                ),
+                SizedBox(height: 16.h),
+                ...members.map((member) {
+                  final isCurrent = member.deviceId == currentDeviceId;
+                  final location = locationByDevice[member.deviceId];
+                  final memberColor = _fromHex(member.avatarColor);
+                  final memberInitial = member.name.isNotEmpty
+                      ? member.name.substring(0, 1).toUpperCase()
+                      : '?';
+                  final statusColor = _locationStatusColor(location);
+
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: memberColor,
+                          child: Text(
+                            memberInitial,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                        child: Text(
-                          'DEV',
+                        title: Text(
+                          isCurrent ? '${member.name} (You)' : member.name,
                           style: TextStyle(
-                            color: AppColors.convoyAmber,
-                            fontSize: 10.sp,
+                            color: Colors.white,
+                            fontWeight:
+                                isCurrent ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        subtitle: Text(
+                          _locationStatusLabel(location),
+                          style: TextStyle(color: statusColor),
+                        ),
+                        trailing: member.role == 'host'
+                            ? const Icon(Icons.star, color: Colors.amber)
+                            : Container(
+                                width: 10.w,
+                                height: 10.h,
+                                decoration: BoxDecoration(
+                                  color: statusColor,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                      ),
+                      Divider(color: AppColors.border, height: 1.h),
+                    ],
+                  );
+                }),
+                if (members.isEmpty)
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: color,
+                        child: Text(
+                          initial,
+                          style: const TextStyle(
+                            color: Colors.white,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                    ],
-                  ],
-                ),
-                SizedBox(height: 16.h),
-                // Host tile (always shown)
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: color,
-                    child: Text(
-                      initial,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  title: Text(
-                    '$name (You)',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: const Text(
-                    'Active - Tracking GPS',
-                    style: TextStyle(color: Colors.greenAccent),
-                  ),
-                  trailing: const Icon(Icons.star, color: Colors.amber),
-                ),
-                // Dummy member tiles (shown when dev mode is active)
-                if (_useDummyRealtimeData && dummySnapshot.isNotEmpty) ...[
-                  Divider(color: AppColors.border, height: 1.h),
-                  ...dummySnapshot.map((member) {
-                    final distLabel = _routePoints.isNotEmpty
-                        ? _memberDistanceLabel(member)
-                        : 'Calculating...';
-                    final statusColor = _routePoints.isNotEmpty
-                        ? _memberStatusColor(member)
-                        : Colors.grey;
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: member.avatarColor,
-                            child: Text(
-                              member.avatarInitial,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          title: Text(
-                            member.name,
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                          subtitle: Text(
-                            distLabel,
-                            style: TextStyle(color: statusColor),
-                          ),
-                          trailing: Container(
-                            width: 10.w,
-                            height: 10.h,
-                            decoration: BoxDecoration(
-                              color: statusColor,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
+                      title: Text(
+                        '$name (You)',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
                         ),
-                        Divider(color: AppColors.border, height: 1.h),
-                      ],
-                    );
-                  }),
-                ],
+                      ),
+                      subtitle: const Text(
+                        'Active - Tracking GPS',
+                        style: TextStyle(color: Colors.greenAccent),
+                      ),
+                      trailing: const Icon(Icons.star, color: Colors.amber),
+                    ),
+                  ),
               ],
             ),
           );
@@ -1164,83 +1055,82 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
     );
   }
 
-  Set<Polyline> get _polylines {
-    if (_routePoints.isEmpty) return {};
-    return {
-      Polyline(
-        polylineId: const PolylineId('route'),
-        points: _routePoints,
-        color: AppColors.convoyBlue,
-        width: 5.w.toInt(),
-      ),
+  List<ConvoyMapMarker> _buildMapMarkers(
+    JourneyEntity journey,
+    List<CheckpointEntity> checkpoints,
+    List<JourneyMemberEntity> members,
+    List<MemberLocationEntity> locations,
+    String currentDeviceId,
+  ) {
+    final markers = <ConvoyMapMarker>[];
+    final locationByDevice = {
+      for (final loc in locations) loc.deviceId: loc,
     };
-  }
 
-  Set<Marker> _buildMarkers(
-      JourneyEntity journey, List<CheckpointEntity> checkpoints) {
-    final markers = <Marker>{};
     if (journey.sourceLat != null && journey.sourceLng != null) {
       markers.add(
-        Marker(
-          markerId: const MarkerId('source'),
+        ConvoyMapMarker(
+          id: 'source',
           position: LatLng(journey.sourceLat!, journey.sourceLng!),
-          infoWindow:
-              InfoWindow(title: 'Starting point: ${journey.sourceName}'),
-          icon:
-              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          color: Colors.green,
+          title: 'Starting point: ${journey.sourceName}',
+          icon: Icons.trip_origin,
         ),
       );
     }
     if (journey.destinationLat != null && journey.destinationLng != null) {
       markers.add(
-        Marker(
-          markerId: const MarkerId('destination'),
+        ConvoyMapMarker(
+          id: 'destination',
           position: LatLng(journey.destinationLat!, journey.destinationLng!),
-          infoWindow:
-              InfoWindow(title: 'Destination: ${journey.destinationName}'),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          color: Colors.red,
+          title: 'Destination: ${journey.destinationName}',
+          icon: Icons.flag,
         ),
       );
     }
-    // Inject live-moving dummy member markers when dev mode is enabled
-    if (_useDummyRealtimeData) {
-      for (final member in _dummyMembers) {
-        markers.add(
-          Marker(
-            markerId: MarkerId(member.id),
-            position: member.currentPosition,
-            infoWindow: InfoWindow(
-              title: member.name,
-              snippet:
-                  _routePoints.isNotEmpty ? _memberDistanceLabel(member) : '',
-            ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(member.markerHue),
-          ),
-        );
-      }
+
+    for (final member in members) {
+      if (member.deviceId == currentDeviceId) continue;
+      final location = locationByDevice[member.deviceId];
+      if (location == null) continue;
+
+      markers.add(
+        ConvoyMapMarker(
+          id: member.deviceId,
+          position: LatLng(location.latitude, location.longitude),
+          color: _fromHex(member.avatarColor),
+          title: member.name,
+          subtitle: _locationStatusLabel(location),
+          icon: Icons.person_pin_circle,
+        ),
+      );
     }
-    // Inject checkpoints as markers on the map
+
     for (final cp in checkpoints) {
-      double hue;
+      Color color;
+      IconData icon;
       switch (cp.type) {
         case 'fuel':
-          hue = BitmapDescriptor.hueYellow;
+          color = AppColors.convoyAmber;
+          icon = Icons.local_gas_station;
           break;
         case 'rest':
-          hue = BitmapDescriptor.hueGreen;
+          color = AppColors.convoyGreen;
+          icon = Icons.restaurant;
           break;
         default:
-          hue = BitmapDescriptor.hueBlue; // meetup
+          color = AppColors.convoyBlue;
+          icon = Icons.people;
       }
       markers.add(
-        Marker(
-          markerId: MarkerId('checkpoint_${cp.id}'),
+        ConvoyMapMarker(
+          id: 'checkpoint_${cp.id}',
           position: LatLng(cp.latitude, cp.longitude),
-          infoWindow: InfoWindow(
-            title: '${cp.name} (${cp.type.toUpperCase()})',
-            snippet: 'Radius: ${cp.radius.round()}m',
-          ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(hue),
+          color: color,
+          title: '${cp.name} (${cp.type.toUpperCase()})',
+          subtitle: 'Radius: ${cp.radius.round()}m',
+          icon: icon,
         ),
       );
     }
@@ -1256,6 +1146,11 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
     final checkpointsAsync =
         ref.watch(watchCheckpointsProvider(widget.journeyId));
     final checkpoints = checkpointsAsync.valueOrNull ?? [];
+    final members =
+        ref.watch(journeyMembersProvider(widget.journeyId)).valueOrNull ?? [];
+    final locations =
+        ref.watch(memberLocationsProvider(widget.journeyId)).valueOrNull ?? [];
+    final memberCount = members.isEmpty ? 1 : members.length;
 
     return Scaffold(
       body: journeyAsync.when(
@@ -1271,6 +1166,7 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
           final isRouteConfigured = journey.destinationLat != null;
 
           if (isRouteConfigured) {
+            ref.watch(liveLocationSyncProvider(widget.journeyId));
             _fetchRoute(
               journey.sourceLat!,
               journey.sourceLng!,
@@ -1282,29 +1178,27 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
 
           return Stack(
             children: [
-              // 1. Google Map layer
               locationAsync.when(
                 data: (position) {
                   final latLng = LatLng(position.latitude, position.longitude);
                   _currentLatLng = latLng;
 
-                  return GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: isRouteConfigured
-                          ? LatLng(
-                              journey.destinationLat!, journey.destinationLng!)
-                          : latLng,
-                      zoom: 14,
+                  return ConvoyMap(
+                    initialCenter: isRouteConfigured
+                        ? LatLng(
+                            journey.destinationLat!, journey.destinationLng!)
+                        : latLng,
+                    initialZoom: 14,
+                    routePoints: _routePoints,
+                    markers: _buildMapMarkers(
+                      journey,
+                      checkpoints,
+                      members,
+                      locations,
+                      currentDeviceId,
                     ),
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: false,
-                    compassEnabled: false,
-                    mapType: MapType.normal,
-                    polylines: _polylines,
-                    markers: _buildMarkers(journey, checkpoints),
-                    onLongPress: isHost
-                        ? (latLng) => _showAddCheckpointDialog(latLng)
-                        : null,
+                    currentPosition: latLng,
+                    onLongPress: isHost ? _showAddCheckpointDialog : null,
                     onMapCreated: (controller) {
                       _mapController = controller;
                       if (isRouteConfigured) {
@@ -1326,7 +1220,12 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
                   top: 50.h,
                   left: 20.w,
                   right: 20.w,
-                  child: _buildTopOverlay(journey, isRouteConfigured, isHost),
+                  child: _buildTopOverlay(
+                    journey,
+                    isRouteConfigured,
+                    isHost,
+                    memberCount,
+                  ),
                 ),
 
               // 3. Setup Sheet or Live overlay — also hidden on location error.
@@ -1354,8 +1253,8 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
                                 topLeft: Radius.circular(24.r),
                                 topRight: Radius.circular(24.r),
                               ),
-                              border:
-                                  Border.all(color: AppColors.border, width: 1.w),
+                              border: Border.all(
+                                  color: AppColors.border, width: 1.w),
                             ),
                             padding: EdgeInsets.symmetric(
                                 horizontal: 24.w, vertical: 36.h),
@@ -1388,7 +1287,7 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
                     bottom: 30.h,
                     left: 20.w,
                     right: 20.w,
-                    child: _buildBottomOverlay(journey),
+                    child: _buildBottomOverlay(journey, currentDeviceId),
                   ),
 
               if (isRouteConfigured)
@@ -1412,7 +1311,11 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
   }
 
   Widget _buildTopOverlay(
-      JourneyEntity journey, bool isRouteConfigured, bool isHost) {
+    JourneyEntity journey,
+    bool isRouteConfigured,
+    bool isHost,
+    int memberCount,
+  ) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
       decoration: BoxDecoration(
@@ -1448,8 +1351,8 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
                   !isRouteConfigured
                       ? 'Setting up Convoy...'
                       : (journey.status == JourneyStatus.paused
-                          ? 'Convoy Paused • ${_useDummyRealtimeData && _dummyMembers.isNotEmpty ? _dummyMembers.length + 1 : 1} members online'
-                          : 'Convoy Active • ${_useDummyRealtimeData && _dummyMembers.isNotEmpty ? _dummyMembers.length + 1 : 1} members online'),
+                          ? 'Convoy Paused • $memberCount members online'
+                          : 'Convoy Active • $memberCount members online'),
                   style: TextStyle(
                     color: !isRouteConfigured
                         ? AppColors.convoyAmber
@@ -1472,7 +1375,7 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
     );
   }
 
-  Widget _buildBottomOverlay(JourneyEntity journey) {
+  Widget _buildBottomOverlay(JourneyEntity journey, String currentDeviceId) {
     return Container(
       padding: EdgeInsets.symmetric(vertical: 16.h),
       decoration: BoxDecoration(
@@ -1483,7 +1386,10 @@ class _JourneyDashboardScreenState extends ConsumerState<JourneyDashboardScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildBottomAction(Icons.people, 'Members', onTap: _showMembersSheet),
+          _buildBottomAction(Icons.people, 'Members',
+              onTap: () => _showMembersSheet(journey.id, currentDeviceId)),
+          _buildBottomAction(Icons.chat_bubble_outline, 'Chat',
+              onTap: () => context.push('/journey/${journey.id}/group-chat')),
           _buildBottomAction(Icons.flag, 'Checkpoints',
               onTap: () => _showCheckpointsSheet(journey)),
           _buildBottomAction(Icons.qr_code, 'Invite',

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../data/database/app_database.dart';
+import '../../../domain/entities/chat_message.dart';
 
 class ChatBubble extends StatelessWidget {
-  final ChatMessage message;
+  final ChatMessageEntity message;
 
   const ChatBubble({super.key, required this.message});
 

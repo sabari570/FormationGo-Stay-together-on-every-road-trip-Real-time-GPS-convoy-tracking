@@ -1,121 +1,148 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
+
 import '../../../core/constants/api_keys.dart';
-import '../../../data/database/app_database.dart';
+import '../../../domain/entities/chat_message.dart';
+import '../../../domain/entities/checkpoint.dart';
 import '../../../domain/entities/journey.dart';
+import '../../../domain/entities/route_poi.dart';
+import 'route_assistant_exception.dart';
+import 'route_context_builder.dart';
 
 class GeminiService {
+  static const _modelFallbackChain = [
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+  ];
+
   GeminiService();
 
   Future<String> askAboutRoute({
     required String userQuestion,
-    required List<RoutePoi> routePois,
+    required List<RoutePoiEntity> routePois,
     required JourneyEntity journey,
-    required List<ChatMessage> history,
+    required List<CheckpointEntity> checkpoints,
+    required List<ChatMessageEntity> history,
   }) async {
-    // 1. Build a relevant POI context string from cached route POIs
-    final poiContext = _buildPoiContext(routePois, userQuestion);
+    if (!ApiKeys.hasGeminiApiKey) {
+      throw const RouteAssistantException(
+        'Gemini API key is not configured.',
+        isRetryable: false,
+      );
+    }
 
-    // 2. System prompt instructing Gemini to act as a premium tour guide for the specific route
+    final routeContext = RouteContextBuilder.buildSystemContext(
+      journey: journey,
+      routePois: routePois,
+      checkpoints: checkpoints,
+      userQuestion: userQuestion,
+    );
+
     final systemPrompt = '''
-You are a friendly, enthusiastic, and knowledgeable convoy tour guide/assistant for a road trip 
-from ${journey.sourceName ?? 'Origin'} to ${journey.destinationName ?? 'Destination'}.
+You are a friendly convoy tour guide helping drivers and passengers on a group road trip.
 
 Your role:
-- Help convoy drivers and passengers find the best places along their exact route.
-- Answer questions in a warm, engaging, and highly conversational road-trip guide style.
-- Always recommend real places from the ROUTE DATA context below.
-- Do NOT hallucinate places that are not in the provided ROUTE DATA.
-- If asked about food/dining, mention the restaurant's rating (if available) and style.
-- If asked about nature/scenic locations, describe the outdoor, photographic, or scenic vibe.
-- Keep responses relatively concise and easy to read (use bullet points or emojis) since users are traveling.
+- Answer using ONLY the journey, checkpoint, and route-place data below.
+- Never invent restaurants, fuel stations, viewpoints, or addresses.
+- Prefer places marked near start, mid-route, or near destination when giving directions.
+- Mention planned convoy checkpoints when they are relevant to the question.
+- Keep answers concise and practical for people actively driving.
+- Use bullet points when listing multiple options.
 
-ROUTE DATA (Places fetched along this exact route):
-$poiContext
+$routeContext
 ''';
 
-    // 3. Format history and current prompt using Content structures
+    final sanitizedHistory = _sanitizeHistory(history);
     final contents = <Content>[];
 
-    // Build history content if any
-    for (final msg in history) {
+    for (final msg in sanitizedHistory) {
       if (msg.role == 'user') {
         contents.add(Content.text(msg.content));
       } else {
         contents.add(Content.model([TextPart(msg.content)]));
       }
     }
-
-    // Append the system prompt context as part of the user's latest query or model context.
-    // In Gemini Generative AI, system instructions are passed to the model or prepended.
-    // We can prepend the system prompt context to the user's question or use GenerativeModel systemInstruction.
-    // The google_generative_ai package supports setting systemInstruction on creation,
-    // but since we want the system instructions to be journey-aware and dynamically constructed,
-    // we can create a dynamic GenerativeModel per request, or we can just pass the system instruction as a systemInstruction parameter.
-
-    final dynamicModel = GenerativeModel(
-      model: 'gemini-2.5-flash',
-      apiKey: ApiKeys.geminiApiKey,
-      systemInstruction: Content.system(systemPrompt),
-      generationConfig: GenerationConfig(
-        temperature: 0.7,
-        maxOutputTokens: 800,
-      ),
-    );
-
     contents.add(Content.text(userQuestion));
 
-    final response = await dynamicModel.generateContent(contents);
-    return response.text ??
-        "I'm sorry, I couldn't process your request. Please try again.";
+    Object? lastError;
+    for (final modelName in _modelFallbackChain) {
+      try {
+        final model = GenerativeModel(
+          model: modelName,
+          apiKey: ApiKeys.geminiApiKey,
+          systemInstruction: Content.system(systemPrompt),
+          generationConfig: GenerationConfig(
+            temperature: 0.35,
+            maxOutputTokens: 900,
+          ),
+        );
+
+        final response = await model.generateContent(contents);
+
+        final blockReason = response.promptFeedback?.blockReason;
+        if (blockReason != null) {
+          throw RouteAssistantException(
+            'Response blocked by safety filters ($blockReason).',
+          );
+        }
+
+        final text = response.text?.trim();
+        if (text != null && text.isNotEmpty) {
+          return text;
+        }
+
+        throw const RouteAssistantException('Empty response from Gemini.');
+      } on GenerativeAIException catch (e) {
+        lastError = e;
+        final message = e.message.toLowerCase();
+        if (message.contains('not found') || message.contains('404')) {
+          continue;
+        }
+        throw _mapGenerativeAiError(e);
+      } on RouteAssistantException {
+        rethrow;
+      } catch (e) {
+        lastError = e;
+        continue;
+      }
+    }
+
+    if (lastError is GenerativeAIException) {
+      throw _mapGenerativeAiError(lastError);
+    }
+    throw RouteAssistantException(
+      'All Gemini models failed. Check your API key and network connection.',
+    );
   }
 
-  String _buildPoiContext(List<RoutePoi> pois, String question) {
-    if (pois.isEmpty) {
-      return "No specific places registered along the route yet.";
+  List<ChatMessageEntity> _sanitizeHistory(List<ChatMessageEntity> history) {
+    return history.where((msg) {
+      if (msg.content == 'Thinking...') return false;
+      if (msg.role == 'assistant' &&
+          (msg.content.startsWith('Failed to connect') ||
+              msg.content.startsWith('📍 Using local route guide') ||
+              msg.content.startsWith('Sorry, I could not answer'))) {
+        return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  RouteAssistantException _mapGenerativeAiError(GenerativeAIException e) {
+    final message = e.message.toLowerCase();
+    if (message.contains('api key') ||
+        message.contains('invalid') ||
+        message.contains('permission')) {
+      return const RouteAssistantException(
+        'Invalid Gemini API key. Get a free key at aistudio.google.com/apikey',
+        isRetryable: false,
+      );
     }
-
-    final queryLower = question.toLowerCase();
-
-    // Sort or filter POIs based on search intent to fit nicely in model limits (RAG)
-    var filteredPois = List<RoutePoi>.from(pois);
-    if (queryLower.contains('food') ||
-        queryLower.contains('eat') ||
-        queryLower.contains('restaurant') ||
-        queryLower.contains('cafe')) {
-      filteredPois = pois.where((p) => p.category == 'restaurant').toList();
-    } else if (queryLower.contains('nature') ||
-        queryLower.contains('view') ||
-        queryLower.contains('park') ||
-        queryLower.contains('scenic') ||
-        queryLower.contains('waterfall')) {
-      filteredPois = pois
-          .where((p) => p.category == 'nature' || p.category == 'scenic')
-          .toList();
-    } else if (queryLower.contains('fuel') ||
-        queryLower.contains('gas') ||
-        queryLower.contains('petrol') ||
-        queryLower.contains('diesel')) {
-      filteredPois = pois.where((p) => p.category == 'fuel').toList();
-    } else if (queryLower.contains('hotel') ||
-        queryLower.contains('stay') ||
-        queryLower.contains('lodge') ||
-        queryLower.contains('rest')) {
-      filteredPois = pois
-          .where((p) => p.category == 'rest_area' || p.category == 'restaurant')
-          .toList();
+    if (message.contains('quota') || message.contains('rate')) {
+      return const RouteAssistantException(
+        'Gemini API quota exceeded. Try again later or use local fallback.',
+      );
     }
-
-    // If filtering left us with nothing, fall back to all POIs
-    if (filteredPois.isEmpty) {
-      filteredPois = pois;
-    }
-
-    // Limit context length to top 25 POIs to prevent prompt bloating
-    filteredPois = filteredPois.take(25).toList();
-
-    return filteredPois.map((poi) {
-      final ratingStr = poi.rating != null ? '${poi.rating} ⭐' : 'N/A';
-      return '- ${poi.name} [Category: ${poi.category}] | Rating: $ratingStr | Address: ${poi.address ?? "On route"} | Lat/Lng: (${poi.latitude}, ${poi.longitude})';
-    }).join('\n');
+    return RouteAssistantException('Gemini error: ${e.message}');
   }
 }

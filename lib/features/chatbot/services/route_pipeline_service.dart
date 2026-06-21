@@ -1,23 +1,32 @@
 import 'dart:math' as math;
-import 'package:drift/drift.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import '../../../data/database/app_database.dart';
+
+import 'package:latlong2/latlong.dart';
+
+import '../models/route_poi_indexing_state.dart';
 import '../../../domain/entities/journey.dart';
-import '../../tracking/services/directions_service.dart';
-import 'places_service.dart';
+import '../../../domain/repositories/route_poi_repository.dart';
 import 'overpass_service.dart';
+import '../../../domain/entities/route_poi.dart';
+
+typedef RoutePoiPipelineListener = void Function(
+  String journeyId,
+  RoutePoiIndexingState state,
+);
 
 class RoutePipelineService {
-  final AppDatabase _db;
-  final PlacesService _placesService;
+  final RoutePoiRepository _poiRepository;
   final OverpassService _overpassService;
-  final DirectionsService _directionsService = DirectionsService();
+  final Set<String> _activeJourneys = {};
 
-  RoutePipelineService(this._db, this._placesService, this._overpassService);
+  RoutePoiPipelineListener? onStatusChanged;
 
-  /// Initializes the background pipeline for a specific journey.
-  /// Decodes routes, samples waypoints, parallel fetches POIs, and caches them.
-  Future<void> initializeForJourney(JourneyEntity journey) async {
+  RoutePipelineService(this._poiRepository, this._overpassService);
+
+  Future<void> initializeForJourney(
+    JourneyEntity journey, {
+    List<LatLng>? routeCoordinates,
+    bool force = false,
+  }) async {
     if (journey.sourceLat == null ||
         journey.sourceLng == null ||
         journey.destinationLat == null ||
@@ -25,63 +34,80 @@ class RoutePipelineService {
       return;
     }
 
-    // Check if POIs are already cached in local SQLite to avoid redundant API requests
-    final existing = await (_db.select(_db.routePois)..where((t) => t.journeyId.equals(journey.id))).get();
-    if (existing.isNotEmpty) {
-      print('RoutePipelineService: ${existing.length} POIs are already cached for journey ${journey.id}. Skipping fetch.');
+    if (_activeJourneys.contains(journey.id)) return;
+    if (!force && await _poiRepository.hasPois(journey.id)) {
+      onStatusChanged?.call(journey.id, RoutePoiIndexingState.ready);
       return;
     }
 
-    // 1. Fetch route coordinates from Directions API
-    final coordinates = await _directionsService.getRouteCoordinates(
-      journey.sourceLat!,
-      journey.sourceLng!,
-      journey.destinationLat!,
-      journey.destinationLng!,
-    );
+    _activeJourneys.add(journey.id);
+    onStatusChanged?.call(journey.id, RoutePoiIndexingState.indexing);
 
-    if (coordinates.isEmpty) {
-      // Fallback: If Directions API fails, just sample start and end points
-      coordinates.add(LatLng(journey.sourceLat!, journey.sourceLng!));
-      coordinates.add(LatLng(journey.destinationLat!, journey.destinationLng!));
+    try {
+      await _fetchAndCachePois(journey, routeCoordinates);
+      final hasPois = await _poiRepository.hasPois(journey.id);
+      onStatusChanged?.call(
+        journey.id,
+        hasPois ? RoutePoiIndexingState.ready : RoutePoiIndexingState.failed,
+      );
+    } catch (_) {
+      onStatusChanged?.call(journey.id, RoutePoiIndexingState.failed);
+    } finally {
+      _activeJourneys.remove(journey.id);
     }
-
-    // 2. Sample coordinates along the route (every ~15-20km, or ~5-8 points along the way)
-    final sampledPoints = _samplePoints(coordinates, targetCount: 6);
-
-    // 3. Parallel fetch from Google Places and OpenStreetMap (Overpass)
-    final futures = <Future<List<RoutePoi>>>[];
-    for (final point in sampledPoints) {
-      futures.add(_placesService.fetchNearby(center: point, journeyId: journey.id));
-      futures.add(_overpassService.fetchNaturePois(center: point, journeyId: journey.id));
-    }
-
-    // Resolve all parallel tasks
-    final poiLists = await Future.wait(futures);
-
-    // 4. Flatten lists and batch insert into SQLite database
-    final allPois = poiLists.expand((list) => list).toList();
-    
-    // Batch save POIs into database
-    await _db.batch((batch) {
-      for (final poi in allPois) {
-        batch.insert(
-          _db.routePois,
-          poi,
-          mode: InsertMode.insertOrReplace,
-        );
-      }
-    });
-
-    print('RoutePipelineService: Successfully cached ${allPois.length} POIs for journey ${journey.id}');
   }
 
-  /// Helper to sample coordinates so we cover the route without spamming API calls
-  List<LatLng> _samplePoints(List<LatLng> points, {int targetCount = 6}) {
+  Future<void> _fetchAndCachePois(
+    JourneyEntity journey,
+    List<LatLng>? routeCoordinates,
+  ) async {
+    final coordinates = routeCoordinates ?? <LatLng>[];
+    final resolvedCoordinates = coordinates.isNotEmpty
+        ? coordinates
+        : <LatLng>[
+            LatLng(journey.sourceLat!, journey.sourceLng!),
+            LatLng(journey.destinationLat!, journey.destinationLng!),
+          ];
+
+    final sampledPoints = _samplePoints(resolvedCoordinates, targetCount: 4);
+    if (sampledPoints.isEmpty) return;
+
+    final seenIds = <String>{};
+
+    for (var i = 0; i < sampledPoints.length; i++) {
+      if (i > 0) {
+        await Future.delayed(const Duration(seconds: 2));
+      }
+
+      final pois = await _overpassService.fetchPoisAtPoint(
+        center: sampledPoints[i],
+        journeyId: journey.id,
+      );
+      final unique = _dedupePois(pois, seenIds);
+      if (unique.isNotEmpty) {
+        await _poiRepository.savePois(unique);
+      }
+    }
+  }
+
+  List<RoutePoiEntity> _dedupePois(
+    List<RoutePoiEntity> pois,
+    Set<String> seenIds,
+  ) {
+    final unique = <RoutePoiEntity>[];
+    for (final poi in pois) {
+      if (seenIds.add(poi.id)) {
+        unique.add(poi);
+      }
+    }
+    return unique;
+  }
+
+  List<LatLng> _samplePoints(List<LatLng> points, {int targetCount = 4}) {
     if (points.length <= targetCount) return points;
 
     final result = <LatLng>[];
-    result.add(points.first); // Always include start point
+    result.add(points.first);
 
     final interval = points.length / (targetCount - 1);
     for (int i = 1; i < targetCount - 1; i++) {
@@ -91,14 +117,13 @@ class RoutePipelineService {
       }
     }
 
-    result.add(points.last); // Always include end point
+    result.add(points.last);
 
-    // De-duplicate closely located sampled points (within 5km of each other)
     final filtered = <LatLng>[];
     for (final point in result) {
-      bool isTooClose = false;
+      var isTooClose = false;
       for (final selected in filtered) {
-        if (_distanceInKm(point, selected) < 8.0) {
+        if (_distanceInKm(point, selected) < 10.0) {
           isTooClose = true;
           break;
         }
@@ -112,19 +137,17 @@ class RoutePipelineService {
   }
 
   double _distanceInKm(LatLng p1, LatLng p2) {
-    const double earthRadius = 6371; // In kilometers
-    final double dLat = _degreesToRadians(p2.latitude - p1.latitude);
-    final double dLng = _degreesToRadians(p2.longitude - p1.longitude);
-    final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+    const earthRadius = 6371.0;
+    final dLat = _degreesToRadians(p2.latitude - p1.latitude);
+    final dLng = _degreesToRadians(p2.longitude - p1.longitude);
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(_degreesToRadians(p1.latitude)) *
             math.cos(_degreesToRadians(p2.latitude)) *
             math.sin(dLng / 2) *
             math.sin(dLng / 2);
-    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return earthRadius * c;
   }
 
-  double _degreesToRadians(double degrees) {
-    return degrees * math.pi / 180;
-  }
+  double _degreesToRadians(double degrees) => degrees * math.pi / 180;
 }

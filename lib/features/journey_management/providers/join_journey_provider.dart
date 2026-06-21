@@ -1,7 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../../core/providers/device_identity_provider.dart';
 import '../../../core/providers/repository_providers.dart';
 import '../../../domain/entities/journey.dart';
+import '../../../domain/entities/journey_member.dart';
+import '../../../features/home/providers/home_provider.dart';
 
 part 'join_journey_provider.g.dart';
 
@@ -15,58 +18,51 @@ class JoinJourney extends _$JoinJourney {
   Future<JourneyEntity?> joinJourney(String pin) async {
     state = const AsyncValue.loading();
     try {
-      // 1. Search Firestore for active journey with passcode
-      JourneyEntity? foundJourney;
-      try {
-        final querySnapshot = await FirebaseFirestore.instance
-            .collection('journeys')
-            .where('passCode', isEqualTo: pin)
-            .where('status', isEqualTo: 'active')
-            .limit(1)
-            .get();
+      final journeyRepo = ref.read(journeyRepositoryProvider);
+      final memberRepo = ref.read(memberRepositoryProvider);
+      final deviceId = ref.read(deviceIdProvider);
+      final profile = await ref.read(currentProfileProvider.future);
 
-        if (querySnapshot.docs.isNotEmpty) {
-          final data = querySnapshot.docs.first.data();
-          foundJourney = JourneyEntity(
-            id: data['id'] as String,
-            name: data['name'] as String,
-            hostId: data['hostId'] as String,
-            passCode: data['passCode'] as String,
-            status: JourneyStatus.values.firstWhere(
-              (e) => e.name == data['status'],
-              orElse: () => JourneyStatus.active,
-            ),
-            createdAt: DateTime.parse(data['createdAt'] as String),
-            updatedAt: DateTime.parse(data['updatedAt'] as String),
-            sourceName: data['sourceName'] as String?,
-            sourceLat: data['sourceLat'] as double?,
-            sourceLng: data['sourceLng'] as double?,
-            destinationName: data['destinationName'] as String?,
-            destinationLat: data['destinationLat'] as double?,
-            destinationLng: data['destinationLng'] as double?,
-          );
-        }
-      } catch (e) {
-        // Firestore query failed (e.g. Firebase not configured/initialized)
-        // Fallback to local SQLite database search for demo/testing purposes
-        final localJourneys = await ref.read(journeyRepositoryProvider).getAllJourneys();
-        foundJourney = localJourneys.cast<JourneyEntity?>().firstWhere(
-              (j) => j?.passCode == pin && j?.status == JourneyStatus.active,
-              orElse: () => null,
-            );
-      }
+      final foundJourney = await journeyRepo.findByPasscode(pin);
 
       if (foundJourney != null) {
-        // 2. Save found journey locally so that detail screen can query it
-        await ref.read(journeyRepositoryProvider).saveJourney(foundJourney);
+        final existingMembers = await memberRepo.getMembers(foundJourney.id);
+        final alreadyJoined =
+            existingMembers.any((m) => m.deviceId == deviceId);
+
+        if (!alreadyJoined) {
+          await memberRepo.addMember(
+            JourneyMemberEntity(
+              id: deviceId,
+              journeyId: foundJourney.id,
+              deviceId: deviceId,
+              role: foundJourney.hostId == deviceId ? 'host' : 'member',
+              name: profile?.name ?? 'Member',
+              avatarColor: profile?.avatarColor ?? '#2196F3',
+              joinTime: DateTime.now(),
+            ),
+          );
+        }
+
+        final authUid = FirebaseAuth.instance.currentUser?.uid;
+        if (authUid != null) {
+          await ref.read(memberAuthDatasourceProvider).upsertMemberAuth(
+                journeyId: foundJourney.id,
+                authUid: authUid,
+                deviceId: deviceId,
+                name: profile?.name ?? 'Member',
+                avatarColor: profile?.avatarColor ?? '#2196F3',
+              );
+        }
+
         state = AsyncValue.data(foundJourney);
         return foundJourney;
-      } else {
-        state = AsyncValue.error(
-          Exception('No active journey found with passcode $pin'),
-          StackTrace.current,
-        );
       }
+
+      state = AsyncValue.error(
+        Exception('No active journey found with passcode $pin'),
+        StackTrace.current,
+      );
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }

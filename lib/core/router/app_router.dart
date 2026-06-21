@@ -9,6 +9,7 @@ import '../../features/journey_management/screens/create_journey_screen.dart';
 import '../../features/journey_management/screens/join_journey_screen.dart';
 import '../../features/journey_management/screens/journey_dashboard_screen.dart';
 import '../../features/chatbot/screens/chatbot_screen.dart';
+import '../../features/group_chat/screens/group_chat_screen.dart';
 
 part 'app_router.g.dart';
 
@@ -52,6 +53,13 @@ GoRouter appRouter(AppRouterRef ref) {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           return ChatbotScreen(journeyId: id);
+        },
+      ),
+      GoRoute(
+        path: '/journey/:id/group-chat',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return GroupChatScreen(journeyId: id);
         },
       ),
     ],

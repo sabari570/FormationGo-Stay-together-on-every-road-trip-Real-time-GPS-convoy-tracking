@@ -1,31 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_core/firebase_core.dart';
-
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
+import 'core/services/firebase_bootstrap.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/providers/device_identity_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Lock orientation to portrait only
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  
-  // Initialize Firebase (wrapped in try-catch in case google-services.json is not configured yet)
+
   try {
-    await Firebase.initializeApp();
+    await dotenv.load(fileName: '.env');
   } catch (e) {
-    debugPrint('Firebase init failed: $e. Make sure google-services.json is added.');
+    debugPrint('Could not load .env: $e');
   }
 
-  // Initialize SharedPreferences
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
+  try {
+    await initializeFirebase();
+  } on FirebaseException catch (e) {
+    debugPrint('Firebase error [${e.code}]: ${e.message}');
+    if (e.code == 'operation-not-allowed') {
+      debugPrint(
+        'Enable Anonymous sign-in: Firebase Console → Authentication → Sign-in method → Anonymous → Enable',
+      );
+    }
+  } catch (e, st) {
+    debugPrint('Firebase init failed: $e\n$st');
+    debugPrint('See FIREBASE_SETUP.md if google-services.json or rules are not configured.');
+  }
+
   final prefs = await SharedPreferences.getInstance();
-  
+
   runApp(ProviderScope(
     overrides: [
       sharedPreferencesProvider.overrideWithValue(prefs),
@@ -42,14 +54,14 @@ class FormationGoApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
 
     return ScreenUtilInit(
-      designSize: const Size(390, 844), // iPhone 14 Pro logical resolution
+      designSize: const Size(390, 844),
       minTextAdapt: true,
       splitScreenMode: false,
       builder: (context, child) {
         return MaterialApp.router(
           title: 'FormationGo',
           theme: AppTheme.darkTheme,
-          themeMode: ThemeMode.dark, // Enforce dark theme
+          themeMode: ThemeMode.dark,
           routerConfig: router,
           debugShowCheckedModeBanner: false,
         );
